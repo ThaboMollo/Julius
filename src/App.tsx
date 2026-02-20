@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Layout } from './app/Layout'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { BudgetPage } from './pages/budget/BudgetPage'
@@ -10,21 +10,21 @@ import { SettingsPage } from './pages/settings/SettingsPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { PlannerPage } from './pages/planner/PlannerPage'
 import { MonthProvider } from './app/MonthContext'
+import { SplashScreen } from './app/SplashScreen'
 import { seedDefaults } from './data/local/seed'
 
 function App() {
-  const [isReady, setIsReady] = useState(false)
+  const [dbReady, setDbReady] = useState(false)
+  const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
-    seedDefaults().then(() => setIsReady(true))
+    seedDefaults().then(() => setDbReady(true))
   }, [])
 
-  if (!isReady) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">Loading...</div>
-      </div>
-    )
+  const handleSplashDone = useCallback(() => setSplashDone(true), [])
+
+  if (!splashDone || !dbReady) {
+    return <SplashScreen onDone={handleSplashDone} />
   }
 
   return (
