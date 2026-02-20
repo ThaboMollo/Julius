@@ -97,6 +97,51 @@ export interface AppSettings {
   updatedAt: Date
 }
 
+// Purchase Scenario - a named "what if" affordability scenario
+export interface PurchaseScenario {
+  id: string
+  name: string
+  description?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Scenario Expense - a monthly cost line item within a scenario
+export interface ScenarioExpense {
+  id: string
+  scenarioId: string
+  name: string
+  monthlyAmount: number
+  sortOrder: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Bank Config - a configured bank account for reconciliation
+export interface BankConfig {
+  id: string
+  bankName: string
+  bankCode: 'fnb' | 'capitec' | 'standard_bank' | 'discovery' | 'absa'
+  uploadFrequency: 'daily' | 'weekly' | 'monthly'
+  isActive: boolean
+  lastUploadAt?: Date
+  createdAt: Date
+  updatedAt: Date
+}
+
+// Statement Upload - a record of a CSV bank statement upload
+export interface StatementUpload {
+  id: string
+  bankConfigId: string
+  filename: string
+  uploadedAt: Date
+  periodStart: Date
+  periodEnd: Date
+  totalTransactions: number
+  matchedCount: number
+  unmatchedCount: number
+}
+
 // Type for creating new entities (without id and timestamps)
 export type CreateBudgetGroup = Omit<BudgetGroup, 'id' | 'createdAt' | 'updatedAt'>
 export type CreateCategory = Omit<Category, 'id' | 'createdAt' | 'updatedAt'>
@@ -105,3 +150,7 @@ export type CreateBudgetItem = Omit<BudgetItem, 'id' | 'createdAt' | 'updatedAt'
 export type CreateTransaction = Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
 export type CreateBillTick = Omit<BillTick, 'id' | 'createdAt' | 'updatedAt'>
 export type CreateRecurringTemplate = Omit<RecurringTemplate, 'id' | 'createdAt' | 'updatedAt'>
+export type CreatePurchaseScenario = Omit<PurchaseScenario, 'id' | 'createdAt' | 'updatedAt'>
+export type CreateScenarioExpense = Omit<ScenarioExpense, 'id' | 'createdAt' | 'updatedAt'>
+export type CreateBankConfig = Omit<BankConfig, 'id' | 'createdAt' | 'updatedAt'>
+export type CreateStatementUpload = Omit<StatementUpload, 'id'>

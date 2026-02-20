@@ -317,3 +317,63 @@ export function getGroupSummaries(
       return { group, planned, actual, remaining, overspend }
     })
 }
+
+// ─────────────────────────────────────────────
+// Affordability calculation
+// ─────────────────────────────────────────────
+
+export type AffordabilityVerdict = 'affordable' | 'tight' | 'cannot_afford'
+
+export interface AffordabilityResult {
+  baselineDisposable: number    // avg monthly disposable over recent months
+  spendingTrend: 'increasing' | 'decreasing' | 'stable'
+  newMonthlyObligations: number // sum of scenario expenses
+  remainingAfterScenario: number
+  verdict: AffordabilityVerdict
+}
+
+export function calculateAffordability(
+  recentMonths: { totalActual: number; expectedIncome: number }[],
+  scenarioMonthlyTotal: number
+): AffordabilityResult {
+  if (recentMonths.length === 0) {
+    return {
+      baselineDisposable: 0,
+      spendingTrend: 'stable',
+      newMonthlyObligations: scenarioMonthlyTotal,
+      remainingAfterScenario: -scenarioMonthlyTotal,
+      verdict: scenarioMonthlyTotal === 0 ? 'affordable' : 'cannot_afford',
+    }
+  }
+
+  const disposables = recentMonths.map((m) => m.expectedIncome - m.totalActual)
+  const baselineDisposable = disposables.reduce((s, d) => s + d, 0) / disposables.length
+
+  // Trend: compare first half avg vs second half avg of actuals
+  const actuals = recentMonths.map((m) => m.totalActual)
+  const mid = Math.floor(actuals.length / 2)
+  const firstHalfAvg = actuals.slice(0, mid || 1).reduce((s, v) => s + v, 0) / (mid || 1)
+  const secondHalfAvg = actuals.slice(mid).reduce((s, v) => s + v, 0) / (actuals.length - mid)
+  const trendDiff = secondHalfAvg - firstHalfAvg
+  const spendingTrend: AffordabilityResult['spendingTrend'] =
+    trendDiff > 100 ? 'increasing' : trendDiff < -100 ? 'decreasing' : 'stable'
+
+  const remainingAfterScenario = baselineDisposable - scenarioMonthlyTotal
+
+  let verdict: AffordabilityVerdict
+  if (remainingAfterScenario < 0) {
+    verdict = 'cannot_afford'
+  } else if (baselineDisposable > 0 && remainingAfterScenario / baselineDisposable < 0.2) {
+    verdict = 'tight'
+  } else {
+    verdict = 'affordable'
+  }
+
+  return {
+    baselineDisposable,
+    spendingTrend,
+    newMonthlyObligations: scenarioMonthlyTotal,
+    remainingAfterScenario,
+    verdict,
+  }
+}

@@ -5,6 +5,7 @@ import {
   templateRepo,
   settingsRepo,
 } from '../../data/local'
+import { BankAccountsSection } from './BankAccountsSection'
 import type {
   BudgetGroup,
   Category,
@@ -416,6 +417,9 @@ export function SettingsPage() {
           </div>
         )}
       </div>
+
+      {/* Bank Accounts */}
+      <BankAccountsSection />
 
       {/* Modals */}
       {showGroupModal && (

@@ -7,6 +7,8 @@ import { BillsPage } from './pages/bills/BillsPage'
 import { TimelinePage } from './pages/timeline/TimelinePage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
+import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
+import { PlannerPage } from './pages/planner/PlannerPage'
 import { MonthProvider } from './app/MonthContext'
 import { seedDefaults } from './data/local/seed'
 
@@ -35,6 +37,8 @@ function App() {
           <Route path="bills" element={<BillsPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="transactions" element={<TransactionsPage />} />
+          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="planner" element={<PlannerPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
       </Routes>
