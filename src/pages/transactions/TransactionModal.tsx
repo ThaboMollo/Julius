@@ -168,7 +168,7 @@ export function TransactionModal({
               <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Budget Item
                 {categoryItems.length > 0 && (
-                  <span className="text-blue-600 ml-1">*</span>
+                  <span className="text-[#A89060] dark:text-[#C4A86B] ml-1">*</span>
                 )}
               </label>
               <select
