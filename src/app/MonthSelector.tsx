@@ -10,7 +10,7 @@ export function MonthSelector() {
     <div className="flex items-center gap-2">
       <button
         onClick={goToPreviousMonth}
-        className="p-1.5 hover:bg-blue-700 rounded text-lg"
+        className="p-1.5 hover:bg-white/10 rounded text-lg text-white"
         aria-label="Previous month"
       >
         ‹
@@ -18,14 +18,14 @@ export function MonthSelector() {
 
       <button
         onClick={goToCurrentMonth}
-        className="text-sm font-medium min-w-[100px] text-center hover:bg-blue-700 rounded px-2 py-1"
+        className="text-sm font-medium min-w-[100px] text-center hover:bg-white/10 rounded px-2 py-1 text-white"
       >
         {format(selectedMonth, 'MMM yyyy')}
       </button>
 
       <button
         onClick={goToNextMonth}
-        className="p-1.5 hover:bg-blue-700 rounded text-lg"
+        className="p-1.5 hover:bg-white/10 rounded text-lg text-white"
         aria-label="Next month"
       >
         ›
@@ -34,7 +34,7 @@ export function MonthSelector() {
       {!isCurrentMonth && (
         <button
           onClick={goToCurrentMonth}
-          className="text-xs bg-blue-700 hover:bg-blue-600 rounded px-2 py-1 ml-1"
+          className="text-xs bg-[#A89060] hover:bg-[#C4A86B] text-white rounded px-2 py-1 ml-1"
         >
           Today
         </button>
