@@ -15,8 +15,10 @@ import type {
   CreateRecurringTemplate,
 } from '../../domain/models'
 import { formatCurrency } from '../../domain/constants'
+import { useTheme } from '../../app/ThemeContext'
 
 export function SettingsPage() {
+  const { isDark, toggleTheme } = useTheme()
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [groups, setGroups] = useState<BudgetGroup[]>([])
@@ -131,22 +133,46 @@ export function SettingsPage() {
   if (loading || !settings) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
       </div>
     )
   }
 
   return (
     <div className="p-4 space-y-6 pb-24">
-      <h1 className="text-xl font-bold text-gray-800">Settings</h1>
+      <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Settings</h1>
+
+      {/* Appearance */}
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">Appearance</h2>
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">Dark Mode</label>
+            <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Switch to a darker theme</p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className={`relative w-12 h-6 rounded-full transition-colors ${
+              isDark ? 'bg-[#A89060]' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                isDark ? 'translate-x-6' : ''
+              }`}
+            />
+          </button>
+        </div>
+      </div>
 
       {/* App Settings */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Budget Settings</h2>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">Budget Settings</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Payday Day of Month
             </label>
             <input
@@ -155,15 +181,15 @@ export function SettingsPage() {
               max="31"
               value={paydayDay}
               onChange={(e) => setPaydayDay(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
               The day you get paid each month (1-31)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Expected Monthly Income (ZAR)
             </label>
             <input
@@ -172,17 +198,17 @@ export function SettingsPage() {
               min="0"
               value={monthlyIncome}
               onChange={(e) => setMonthlyIncome(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               placeholder="Optional"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
               Used for "Remaining until payday" calculation. Leave empty to use budget total.
             </p>
           </div>
 
           <button
             onClick={saveSettings}
-            className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="w-full py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
           >
             Save Settings
           </button>
@@ -190,31 +216,31 @@ export function SettingsPage() {
       </div>
 
       {/* Budget Groups */}
-      <div className="bg-white rounded-xl shadow">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">Budget Groups</h2>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Budget Groups</h2>
           <button
             onClick={() => {
               setEditingGroup(null)
               setShowGroupModal(true)
             }}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
           >
             + Add
           </button>
         </div>
-        <div className="divide-y">
+        <div className="divide-y dark:divide-[#2E3A4E]">
           {groups.map((group) => (
-            <div key={group.id} className={`p-4 flex items-center justify-between ${!group.isActive ? 'bg-gray-50 opacity-60' : ''}`}>
+            <div key={group.id} className={`p-4 flex items-center justify-between ${!group.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
               <div>
-                <span className="font-medium text-gray-800">{group.name}</span>
+                <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{group.name}</span>
                 {group.isDefault && (
-                  <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                  <span className="ml-2 text-xs bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
                     Default
                   </span>
                 )}
                 {!group.isActive && (
-                  <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                  <span className="ml-2 text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
                     Inactive
                   </span>
                 )}
@@ -222,7 +248,7 @@ export function SettingsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => handleToggleGroupActive(group)}
-                  className="text-sm text-gray-500 hover:text-gray-700"
+                  className="text-sm text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
                 >
                   {group.isActive ? 'Deactivate' : 'Activate'}
                 </button>
@@ -231,7 +257,7 @@ export function SettingsPage() {
                     setEditingGroup(group)
                     setShowGroupModal(true)
                   }}
-                  className="text-sm text-blue-600 hover:text-blue-800"
+                  className="text-sm text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
                 >
                   Edit
                 </button>
@@ -250,29 +276,29 @@ export function SettingsPage() {
       </div>
 
       {/* Categories */}
-      <div className="bg-white rounded-xl shadow">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">Categories</h2>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Categories</h2>
           <button
             onClick={() => {
               setEditingCategory(null)
               setShowCategoryModal(true)
             }}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
           >
             + Add
           </button>
         </div>
-        <div className="divide-y">
+        <div className="divide-y dark:divide-[#2E3A4E]">
           {categories.map((cat) => {
             const group = groups.find((g) => g.id === cat.groupId)
             return (
-              <div key={cat.id} className={`p-4 flex items-center justify-between ${!cat.isActive ? 'bg-gray-50 opacity-60' : ''}`}>
+              <div key={cat.id} className={`p-4 flex items-center justify-between ${!cat.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
                 <div>
-                  <span className="font-medium text-gray-800">{cat.name}</span>
-                  <span className="ml-2 text-xs text-gray-500">{group?.name}</span>
+                  <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{cat.name}</span>
+                  <span className="ml-2 text-xs text-gray-500 dark:text-[#8A9BAA]">{group?.name}</span>
                   {!cat.isActive && (
-                    <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                    <span className="ml-2 text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
                       Inactive
                     </span>
                   )}
@@ -280,7 +306,7 @@ export function SettingsPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleToggleCategoryActive(cat)}
-                    className="text-sm text-gray-500 hover:text-gray-700"
+                    className="text-sm text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
                   >
                     {cat.isActive ? 'Deactivate' : 'Activate'}
                   </button>
@@ -289,7 +315,7 @@ export function SettingsPage() {
                       setEditingCategory(cat)
                       setShowCategoryModal(true)
                     }}
-                    className="text-sm text-blue-600 hover:text-blue-800"
+                    className="text-sm text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
                   >
                     Edit
                   </button>
@@ -309,48 +335,48 @@ export function SettingsPage() {
       </div>
 
       {/* Recurring Templates */}
-      <div className="bg-white rounded-xl shadow">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-800">Recurring Templates</h2>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Recurring Templates</h2>
           <button
             onClick={() => {
               setEditingTemplate(null)
               setShowTemplateModal(true)
             }}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
           >
             + Add
           </button>
         </div>
         {templates.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-gray-500 dark:text-[#8A9BAA] text-sm">
             No recurring templates. Add templates to auto-populate each month's budget.
           </div>
         ) : (
-          <div className="divide-y">
+          <div className="divide-y dark:divide-[#2E3A4E]">
             {templates.map((tmpl) => {
               const group = groups.find((g) => g.id === tmpl.groupId)
               const category = categories.find((c) => c.id === tmpl.categoryId)
               const effective = tmpl.plannedAmount * tmpl.multiplier * tmpl.splitRatio
 
               return (
-                <div key={tmpl.id} className={`p-4 ${!tmpl.isActive ? 'bg-gray-50 opacity-60' : ''}`}>
+                <div key={tmpl.id} className={`p-4 ${!tmpl.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-800">{tmpl.name}</span>
+                        <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{tmpl.name}</span>
                         {tmpl.isBill && (
-                          <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                          <span className="text-xs bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B] px-1.5 py-0.5 rounded">
                             Bill
                           </span>
                         )}
                         {!tmpl.isActive && (
-                          <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">
+                          <span className="text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
                             Inactive
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
+                      <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
                         {group?.name} · {category?.name}
                         {tmpl.multiplier !== 1 && ` × ${tmpl.multiplier}`}
                         {tmpl.splitRatio !== 1 && ` × ${tmpl.splitRatio}`}
@@ -358,11 +384,11 @@ export function SettingsPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-medium text-gray-800">{formatCurrency(effective)}</div>
+                      <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(effective)}</div>
                       <div className="flex gap-2 mt-1">
                         <button
                           onClick={() => handleToggleTemplateActive(tmpl)}
-                          className="text-xs text-gray-500 hover:text-gray-700"
+                          className="text-xs text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
                         >
                           {tmpl.isActive ? 'Deactivate' : 'Activate'}
                         </button>
@@ -371,7 +397,7 @@ export function SettingsPage() {
                             setEditingTemplate(tmpl)
                             setShowTemplateModal(true)
                           }}
-                          className="text-xs text-blue-600 hover:text-blue-800"
+                          className="text-xs text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
                         >
                           Edit
                         </button>
@@ -473,10 +499,10 @@ function GroupModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-sm rounded-xl">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold">{group ? 'Edit Group' : 'Add Group'}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+      <div className="bg-white dark:bg-[#252D3D] w-full max-w-sm rounded-xl">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">{group ? 'Edit Group' : 'Add Group'}</h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
             ×
           </button>
         </div>
@@ -494,36 +520,36 @@ function GroupModal({
           className="p-4 space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Sort Order</label>
             <input
               type="number"
               min="1"
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
             />
           </div>
           <div className="flex gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
             >
               Save
             </button>
@@ -555,10 +581,10 @@ function CategoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-sm rounded-xl">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold">{category ? 'Edit Category' : 'Add Category'}</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+      <div className="bg-white dark:bg-[#252D3D] w-full max-w-sm rounded-xl">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">{category ? 'Edit Category' : 'Add Category'}</h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
             ×
           </button>
         </div>
@@ -576,21 +602,21 @@ function CategoryModal({
           className="p-4 space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Group</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >
               {groups.map((g) => (
@@ -604,13 +630,13 @@ function CategoryModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
             >
               Save
             </button>
@@ -658,12 +684,12 @@ function TemplateModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold">
+      <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">
             {template ? 'Edit Template' : 'Add Template'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
             ×
           </button>
         </div>
@@ -695,22 +721,22 @@ function TemplateModal({
           className="p-4 space-y-4"
         >
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Group</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >
               {groups.map((g) => (
@@ -722,11 +748,11 @@ function TemplateModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Category</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >
               {filteredCategories.map((c) => (
@@ -738,7 +764,7 @@ function TemplateModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Planned Amount (ZAR)
             </label>
             <input
@@ -747,25 +773,25 @@ function TemplateModal({
               min="0"
               value={plannedAmount}
               onChange={(e) => setPlannedAmount(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Multiplier</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Multiplier</label>
               <input
                 type="number"
                 step="1"
                 min="1"
                 value={multiplier}
                 onChange={(e) => setMultiplier(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Split Ratio</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Split Ratio</label>
               <input
                 type="number"
                 step="0.01"
@@ -773,21 +799,21 @@ function TemplateModal({
                 max="1"
                 value={splitRatio}
                 onChange={(e) => setSplitRatio(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               />
             </div>
           </div>
 
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="font-medium text-gray-700">This is a bill</label>
-              <p className="text-xs text-gray-500">Set a monthly due day</p>
+              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This is a bill</label>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Set a monthly due day</p>
             </div>
             <button
               type="button"
               onClick={() => setIsBill(!isBill)}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                isBill ? 'bg-blue-600' : 'bg-gray-300'
+                isBill ? 'bg-[#A89060]' : 'bg-gray-300 dark:bg-[#2E3A4E]'
               }`}
             >
               <span
@@ -800,7 +826,7 @@ function TemplateModal({
 
           {isBill && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Due Day of Month
               </label>
               <input
@@ -809,7 +835,7 @@ function TemplateModal({
                 max="31"
                 value={dueDayOfMonth}
                 onChange={(e) => setDueDayOfMonth(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               />
             </div>
           )}
@@ -818,13 +844,13 @@ function TemplateModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
             >
               Save
             </button>
