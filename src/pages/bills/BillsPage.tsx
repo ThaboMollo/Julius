@@ -26,8 +26,11 @@ const STATUS_BADGES: Record<BillDueStatus, { label: string; className: string }>
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-700' },
   due_today: { label: 'Due Today', className: 'bg-orange-100 text-orange-700' },
   due_tomorrow: { label: 'Tomorrow', className: 'bg-yellow-100 text-yellow-700' },
-  due_before_payday: { label: 'Before Payday', className: 'bg-blue-100 text-blue-700' },
-  upcoming: { label: 'Upcoming', className: 'bg-gray-100 text-gray-600' },
+  due_before_payday: {
+    label: 'Before Payday',
+    className: 'bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B]',
+  },
+  upcoming: { label: 'Upcoming', className: 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA]' },
   paid: { label: 'Paid', className: 'bg-green-100 text-green-700' },
 }
 
@@ -128,7 +131,7 @@ export function BillsPage() {
   if (loading || !settings) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
       </div>
     )
   }
@@ -145,17 +148,17 @@ export function BillsPage() {
     <div className="p-4 space-y-4">
       {/* Summary */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500">Unpaid</div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Unpaid</div>
           <div className="text-xl font-bold text-red-600">{formatCurrency(unpaidTotal)}</div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
             {bills.filter((b) => !billTicks.find((t) => t.budgetItemId === b.id)?.isPaid).length} bills
           </div>
         </div>
-        <div className="bg-white rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500">Paid</div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Paid</div>
           <div className="text-xl font-bold text-green-600">{formatCurrency(paidTotal)}</div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
             {bills.filter((b) => billTicks.find((t) => t.budgetItemId === b.id)?.isPaid).length} bills
           </div>
         </div>
@@ -170,8 +173,8 @@ export function BillsPage() {
               onClick={() => setFilter(f)}
               className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
                 filter === f
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-[#A89060] dark:bg-[#C4A86B] text-white'
+                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-200 dark:hover:bg-[#2E3A4E]'
               }`}
             >
               {f === 'all'
@@ -194,19 +197,19 @@ export function BillsPage() {
 
       {/* Bills List */}
       {bills.length === 0 ? (
-        <div className="bg-white rounded-xl p-6 shadow text-center">
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
           <div className="text-4xl mb-3">📋</div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">No Bills</h3>
-          <p className="text-gray-600 text-sm">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">No Bills</h3>
+          <p className="text-gray-600 dark:text-[#8A9BAA] text-sm">
             Mark budget items as bills on the Budget page to see them here.
           </p>
         </div>
       ) : filteredBills.length === 0 ? (
-        <div className="bg-white rounded-xl p-6 shadow text-center">
-          <p className="text-gray-500">No bills match the current filter</p>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
+          <p className="text-gray-500 dark:text-[#8A9BAA]">No bills match the current filter</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl shadow divide-y">
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow divide-y dark:divide-[#2E3A4E]">
           {filteredBills.map((bill) => {
             const tick = billTicks.find((t) => t.budgetItemId === bill.id)
             const isPaid = tick?.isPaid || false
@@ -218,7 +221,7 @@ export function BillsPage() {
             return (
               <div
                 key={bill.id}
-                className={`p-4 flex items-center gap-3 ${isPaid ? 'bg-gray-50' : ''}`}
+                className={`p-4 flex items-center gap-3 ${isPaid ? 'bg-gray-50 dark:bg-[#1E2330]' : ''}`}
               >
                 {/* Checkbox */}
                 <button
@@ -226,7 +229,7 @@ export function BillsPage() {
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                     isPaid
                       ? 'bg-green-500 border-green-500 text-white'
-                      : 'border-gray-300 hover:border-blue-500'
+                      : 'border-gray-300 dark:border-[#2E3A4E] hover:border-[#A89060]'
                   }`}
                 >
                   {isPaid && '✓'}
@@ -236,7 +239,7 @@ export function BillsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`font-medium ${isPaid ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                      className={`font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA] line-through' : 'text-gray-800 dark:text-[#F0EDE4]'}`}
                     >
                       {bill.name}
                     </span>
@@ -244,7 +247,7 @@ export function BillsPage() {
                       {badge.label}
                     </span>
                   </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
+                  <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
                     {group?.name} · {category?.name}
                     {bill.dueDate && (
                       <span className="ml-2">
@@ -256,7 +259,7 @@ export function BillsPage() {
 
                 {/* Amount */}
                 <div
-                  className={`text-right font-medium ${isPaid ? 'text-gray-400' : 'text-gray-800'}`}
+                  className={`text-right font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA]' : 'text-gray-800 dark:text-[#F0EDE4]'}`}
                 >
                   {formatCurrency(effectivePlanned(bill))}
                 </div>
