@@ -90,7 +90,7 @@ export function TransactionsPage() {
   if (loading || !budgetMonth) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500">Loading...</div>
+        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
       </div>
     )
   }
@@ -119,14 +119,14 @@ export function TransactionsPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Transactions</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Transactions</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
             Total: {formatCurrency(total)} ({filteredTransactions.length} items)
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          className="px-4 py-2 bg-[#A89060] hover:bg-[#8B7550] text-white rounded-lg"
         >
           + Add
         </button>
@@ -139,8 +139,8 @@ export function TransactionsPage() {
             onClick={() => setFilterCategory('')}
             className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
               !filterCategory
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-[#A89060] dark:bg-[#C4A86B] text-white'
+                : 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-200 dark:hover:bg-[#2E3A4E]'
             }`}
           >
             All
@@ -155,8 +155,8 @@ export function TransactionsPage() {
                 onClick={() => setFilterCategory(catId)}
                 className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
                   filterCategory === catId
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? 'bg-[#A89060] dark:bg-[#C4A86B] text-white'
+                    : 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-200 dark:hover:bg-[#2E3A4E]'
                 }`}
               >
                 {cat.name} ({formatCurrency(catTotal)})
@@ -168,16 +168,16 @@ export function TransactionsPage() {
 
       {/* Transactions List */}
       {transactions.length === 0 ? (
-        <div className="bg-white rounded-xl p-6 shadow text-center">
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
           <div className="text-4xl mb-3">💳</div>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">No Transactions</h3>
-          <p className="text-gray-600 text-sm">
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">No Transactions</h3>
+          <p className="text-gray-600 dark:text-[#8A9BAA] text-sm">
             Add your first transaction to start tracking spending.
           </p>
         </div>
       ) : filteredTransactions.length === 0 ? (
-        <div className="bg-white rounded-xl p-6 shadow text-center">
-          <p className="text-gray-500">No transactions in this category</p>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
+          <p className="text-gray-500 dark:text-[#8A9BAA]">No transactions in this category</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -189,14 +189,14 @@ export function TransactionsPage() {
               <div key={dateKey}>
                 {/* Date Header */}
                 <div className="flex justify-between items-center px-2 py-1">
-                  <span className="text-sm font-medium text-gray-600">
+                  <span className="text-sm font-medium text-gray-600 dark:text-[#8A9BAA]">
                     {format(new Date(dateKey), 'EEEE, d MMMM')}
                   </span>
-                  <span className="text-sm text-gray-500">{formatCurrency(dayTotal)}</span>
+                  <span className="text-sm text-gray-500 dark:text-[#8A9BAA]">{formatCurrency(dayTotal)}</span>
                 </div>
 
                 {/* Transactions for this date */}
-                <div className="bg-white rounded-xl shadow divide-y">
+                <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow divide-y dark:divide-[#2E3A4E]">
                   {dayTransactions.map((tx) => {
                     const category = categories.find((c) => c.id === tx.categoryId)
                     const item = items.find((i) => i.id === tx.budgetItemId)
@@ -204,12 +204,12 @@ export function TransactionsPage() {
                     return (
                       <div
                         key={tx.id}
-                        className="p-4 flex justify-between items-center hover:bg-gray-50 cursor-pointer"
+                        className="p-4 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-[#1E2330] cursor-pointer"
                         onClick={() => openEditModal(tx)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-800">
+                            <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">
                               {item?.name || category?.name || 'Unknown'}
                             </span>
                             {!tx.budgetItemId && (
@@ -219,15 +219,15 @@ export function TransactionsPage() {
                             )}
                           </div>
                           {tx.note && (
-                            <div className="text-xs text-gray-500 mt-0.5 truncate">
+                            <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5 truncate">
                               {tx.note}
                             </div>
                           )}
                           {item && category && item.name !== category.name && (
-                            <div className="text-xs text-gray-400 mt-0.5">{category.name}</div>
+                            <div className="text-xs text-gray-400 dark:text-[#8A9BAA] mt-0.5">{category.name}</div>
                           )}
                         </div>
-                        <div className="font-medium text-gray-800">{formatCurrency(tx.amount)}</div>
+                        <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(tx.amount)}</div>
                       </div>
                     )
                   })}

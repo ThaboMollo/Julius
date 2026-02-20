@@ -103,12 +103,12 @@ export function TransactionModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold">
+      <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold dark:text-[#F0EDE4]">
             {transaction ? 'Edit Transaction' : 'Add Transaction'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
             ×
           </button>
         </div>
@@ -116,7 +116,7 @@ export function TransactionModal({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Amount (ZAR) *
             </label>
             <input
@@ -125,7 +125,7 @@ export function TransactionModal({
               min="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-lg"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060] focus:border-[#A89060] text-lg"
               placeholder="0.00"
               required
               autoFocus
@@ -134,23 +134,23 @@ export function TransactionModal({
 
           {/* Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Date *</label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
               required
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Category *</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
               required
             >
               <option value="">Select a category</option>
@@ -165,7 +165,7 @@ export function TransactionModal({
           {/* Budget Item (if category has items) */}
           {categoryItems.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Budget Item
                 {categoryItems.length > 0 && (
                   <span className="text-blue-600 ml-1">*</span>
@@ -174,7 +174,7 @@ export function TransactionModal({
               <select
                 value={budgetItemId}
                 onChange={(e) => setBudgetItemId(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
               >
                 <option value="">None (Unbudgeted)</option>
                 {categoryItems.map((item) => (
@@ -183,7 +183,7 @@ export function TransactionModal({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
                 Link this transaction to a budget item for better tracking.
               </p>
             </div>
@@ -191,14 +191,14 @@ export function TransactionModal({
 
           {/* Note */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Note (optional)
             </label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
               placeholder="e.g., Woolworths groceries"
             />
           </div>
@@ -218,13 +218,13 @@ export function TransactionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-[#A89060] hover:bg-[#8B7550] text-white rounded-lg"
             >
               Save
             </button>
