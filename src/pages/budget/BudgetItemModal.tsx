@@ -112,12 +112,12 @@ export function BudgetItemModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4 border-b flex justify-between items-center">
-          <h2 className="text-lg font-semibold">
+      <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold dark:text-[#F0EDE4]">
             {item ? 'Edit Budget Item' : 'Add Budget Item'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
             ×
           </button>
         </div>
@@ -125,12 +125,12 @@ export function BudgetItemModal({
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Name */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               placeholder="e.g., Rent, WiFi, Groceries"
               required
             />
@@ -138,11 +138,11 @@ export function BudgetItemModal({
 
           {/* Group */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Group</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
             <select
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >
               {groups.map((g) => (
@@ -155,11 +155,11 @@ export function BudgetItemModal({
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Category</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >
               {filteredCategories.length === 0 ? (
@@ -176,7 +176,7 @@ export function BudgetItemModal({
 
           {/* Planned Amount */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Planned Amount (ZAR)
             </label>
             <input
@@ -185,7 +185,7 @@ export function BudgetItemModal({
               min="0"
               value={plannedAmount}
               onChange={(e) => setPlannedAmount(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               placeholder="0.00"
               required
             />
@@ -194,7 +194,7 @@ export function BudgetItemModal({
           {/* Multiplier & Split */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Multiplier
               </label>
               <input
@@ -203,18 +203,18 @@ export function BudgetItemModal({
                 min="1"
                 value={multiplier}
                 onChange={(e) => setMultiplier(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               />
-              <p className="text-xs text-gray-500 mt-1">e.g., 2 for paying twice</p>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">e.g., 2 for paying twice</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Split Ratio
               </label>
               <select
                 value={splitRatioInput}
                 onChange={(e) => setSplitRatioInput(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               >
                 {COMMON_SPLIT_RATIOS.map((r) => (
                   <option key={r.label} value={r.value === 1 ? '1' : r.value === 0.5 ? '1/2' : r.value.toString()}>
@@ -228,14 +228,14 @@ export function BudgetItemModal({
           {/* Bill Toggle */}
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="font-medium text-gray-700">This is a bill</label>
-              <p className="text-xs text-gray-500">Track due date and paid status</p>
+              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This is a bill</label>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Track due date and paid status</p>
             </div>
             <button
               type="button"
               onClick={() => setIsBill(!isBill)}
               className={`relative w-12 h-6 rounded-full transition-colors ${
-                isBill ? 'bg-blue-600' : 'bg-gray-300'
+                isBill ? 'bg-[#A89060]' : 'bg-gray-300 dark:bg-[#2E3A4E]'
               }`}
             >
               <span
@@ -249,7 +249,7 @@ export function BudgetItemModal({
           {/* Due Day (if bill) */}
           {isBill && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
                 Due Day of Month
               </label>
               <input
@@ -258,7 +258,7 @@ export function BudgetItemModal({
                 max="31"
                 value={dueDay}
                 onChange={(e) => setDueDay(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
                 placeholder="1-31"
               />
             </div>
@@ -279,13 +279,13 @@ export function BudgetItemModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-6 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
             >
               Save
             </button>

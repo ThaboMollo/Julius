@@ -129,7 +129,9 @@ export function BudgetPage() {
   if (loading || !budgetMonth) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500">Loading...</div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
+          <p className="text-gray-500 dark:text-[#8A9BAA]">Loading...</p>
+        </div>
       </div>
     )
   }
@@ -141,21 +143,21 @@ export function BudgetPage() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Budget</h1>
-          <p className="text-sm text-gray-500">Total: {formatCurrency(total)}</p>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Budget</h1>
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">Total: {formatCurrency(total)}</p>
         </div>
         <div className="flex gap-2">
           {templates.length > 0 && (
             <button
               onClick={handleCreateFromTemplates}
-              className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              className="px-3 py-2 text-sm bg-gray-100 dark:bg-[#1E2330] text-gray-700 dark:text-[#F0EDE4] rounded-lg hover:bg-gray-200 dark:hover:bg-[#2E3A4E]"
             >
               From Templates
             </button>
           )}
           <button
             onClick={() => openAddModal()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="px-4 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
           >
             + Add Item
           </button>
@@ -164,8 +166,8 @@ export function BudgetPage() {
 
       {/* Groups */}
       {groups.length === 0 ? (
-        <div className="bg-white rounded-xl p-6 shadow text-center">
-          <p className="text-gray-500">No budget groups. Add some in Settings.</p>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
+          <p className="text-gray-500 dark:text-[#8A9BAA]">No budget groups. Add some in Settings.</p>
         </div>
       ) : (
         groups.map((group) => {
@@ -173,26 +175,26 @@ export function BudgetPage() {
           const groupTotal = totalPlannedByGroup(items, group.id)
 
           return (
-            <div key={group.id} className="bg-white rounded-xl shadow overflow-hidden">
-              <div className="bg-gray-50 px-4 py-3 flex justify-between items-center border-b">
+            <div key={group.id} className="bg-white dark:bg-[#252D3D] rounded-xl shadow overflow-hidden">
+              <div className="bg-gray-50 dark:bg-[#1E2330] px-4 py-3 flex justify-between items-center border-b dark:border-[#2E3A4E]">
                 <div>
-                  <h2 className="font-semibold text-gray-800">{group.name}</h2>
-                  <p className="text-sm text-gray-500">{formatCurrency(groupTotal)}</p>
+                  <h2 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">{group.name}</h2>
+                  <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">{formatCurrency(groupTotal)}</p>
                 </div>
                 <button
                   onClick={() => openAddModal(group.id)}
-                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
                 >
                   + Add
                 </button>
               </div>
 
               {groupItems.length === 0 ? (
-                <div className="p-4 text-center text-gray-400 text-sm">
+                <div className="p-4 text-center text-gray-400 dark:text-[#8A9BAA] text-sm">
                   No items in this group
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className="divide-y dark:divide-[#2E3A4E]">
                   {groupItems.map((item) => {
                     const category = categories.find((c) => c.id === item.categoryId)
                     const effective = effectivePlanned(item)
@@ -200,26 +202,26 @@ export function BudgetPage() {
                     return (
                       <div
                         key={item.id}
-                        className="px-4 py-3 flex justify-between items-center hover:bg-gray-50 cursor-pointer"
+                        className="px-4 py-3 flex justify-between items-center hover:bg-gray-50 dark:hover:bg-[#1E2330] cursor-pointer"
                         onClick={() => openEditModal(item)}
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-800 truncate">
+                            <span className="font-medium text-gray-800 dark:text-[#F0EDE4] truncate">
                               {item.name}
                             </span>
                             {item.isBill && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                              <span className="text-xs bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B] px-1.5 py-0.5 rounded">
                                 Bill
                               </span>
                             )}
                             {item.isFromTemplate && (
-                              <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">
+                              <span className="text-xs bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
                                 Template
                               </span>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500 mt-0.5">
+                          <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
                             {category?.name}
                             {item.multiplier !== 1 && ` × ${item.multiplier}`}
                             {item.splitRatio !== 1 && ` × ${item.splitRatio}`}
@@ -231,11 +233,11 @@ export function BudgetPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-medium text-gray-800">
+                          <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">
                             {formatCurrency(effective)}
                           </div>
                           {effective !== item.plannedAmount && (
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
                               ({formatCurrency(item.plannedAmount)})
                             </div>
                           )}
