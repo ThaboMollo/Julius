@@ -12,7 +12,8 @@ export const categoryRepo: ICategoryRepo = {
   },
 
   async getActive(): Promise<Category[]> {
-    return db.categories.where('isActive').equals(1).toArray()
+    const all = await db.categories.toArray()
+    return all.filter((c) => c.isActive)
   },
 
   async getByGroup(groupId: string): Promise<Category[]> {

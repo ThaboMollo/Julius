@@ -12,7 +12,8 @@ export const templateRepo: ITemplateRepo = {
   },
 
   async getActive(): Promise<RecurringTemplate[]> {
-    return db.recurringTemplates.where('isActive').equals(1).toArray()
+    const all = await db.recurringTemplates.toArray()
+    return all.filter((t) => t.isActive)
   },
 
   async getActiveBills(): Promise<RecurringTemplate[]> {

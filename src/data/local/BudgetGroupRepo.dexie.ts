@@ -12,10 +12,8 @@ export const budgetGroupRepo: IBudgetGroupRepo = {
   },
 
   async getActive(): Promise<BudgetGroup[]> {
-    return db.budgetGroups
-      .where('isActive')
-      .equals(1)
-      .sortBy('sortOrder')
+    const all = await db.budgetGroups.orderBy('sortOrder').toArray()
+    return all.filter((g) => g.isActive)
   },
 
   async getById(id: string): Promise<BudgetGroup | undefined> {

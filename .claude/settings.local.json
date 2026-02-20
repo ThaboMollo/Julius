@@ -2,7 +2,27 @@
   "permissions": {
     "allow": [
       "Bash(npm create:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(/Users/thabomollomponya/Dev/Julius/index.html:*)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius add:*)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: add theme flash-prevention script and update meta theme-color to olive\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius log -1 --format=\"%H %s\")",
+      "Bash(/Users/thabomollomponya/Dev/Julius/src/app/ThemeContext.tsx:*)",
+      "Bash(/Users/thabomollomponya/Dev/Julius/src/main.tsx:*)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: add ThemeContext with localStorage persistence\")",
+      "Bash(/Users/thabomollomponya/Dev/Julius/src/index.css:*)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: add gold/olive CSS variables and dark mode body styles\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius show HEAD~1:src/main.tsx)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: olive green header, gold logo, gold active nav state\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: dark mode support for MonthSelector\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: olive KPI gradient, gold numbers, dark mode dashboard cards\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: dark mode toggle in Settings, gold buttons, full dark support for settings page\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: gold buttons, dark mode cards and modal for Budget page\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit -m \"feat: gold filter pills, dark mode cards and badges for Bills page\")",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius commit:*)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius log --oneline -5)",
+      "Bash(git -C /Users/thabomollomponya/Dev/Julius log --format=\"%H %s\" -3)",
+      "Bash(npm run build:*)"
     ]
   }
 }
