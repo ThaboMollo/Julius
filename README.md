@@ -1,73 +1,137 @@
-# React + TypeScript + Vite
+# Julius — Personal Spending Tracker
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Julius is an offline-first, installable PWA for tracking your monthly budget and spending. It replaces manual note-keeping with a structured budget manager that works entirely on your device — no accounts, no cloud, no bank sync required.
 
-Currently, two official plugins are available:
+Built for ZAR (South African Rand) with a payday on the 25th as the default.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Dashboard
+- **Remaining until payday** headline KPI
+- Budget overview: planned vs spent vs remaining
+- Per-group summaries with progress bars (Needs, Should Die, custom groups)
+- Money leaks: overspent categories and unbudgeted transactions
 
-## Expanding the ESLint configuration
+### Budget
+- Organize spending into **budget groups** and **categories**
+- Per-item support for **multipliers** and **split ratios**
+  - `effectivePlanned = plannedAmount × multiplier × splitRatio`
+  - Example: R600 electricity split 50/50 = R300 effective
+- Mark items as **bills** with a due date
+- Copy budget structure from the previous month
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Recurring Templates
+- Define templates once; they auto-populate each new month
+- Active/inactive toggle to skip a template for a period
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Transactions
+- Manually log spending: amount, date, category, and optional budget item link
+- Grouped by date, filterable by category
+- Actuals update budget item and category totals immediately
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### Bills
+- Bills list derived from budget items flagged as bills
+- Manual paid/unpaid tick that persists across sessions
+- Status badges: Overdue, Due Today, Due Tomorrow, Due Before Payday
+- Filter by due status
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Timeline
+- Chronological view of upcoming bills and payday
+- Running balance projection to show cashflow pressure points
+- Warns when the projected balance goes negative
+
+### Settings
+- Configure payday day-of-month (default: 25th)
+- Set expected monthly income (optional)
+- Manage budget groups and categories (safe delete — blocks removal if referenced)
+- Manage recurring templates
+
+### Offline / PWA
+- Installable on Android and desktop (Add to Home Screen)
+- Works fully offline after first load — all data stays on your device in IndexedDB
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | React 19 + TypeScript |
+| Build | Vite |
+| Routing | React Router v7 |
+| Styling | Tailwind CSS v4 |
+| Local DB | Dexie (IndexedDB wrapper) |
+| Date utils | date-fns |
+| PWA | vite-plugin-pwa + service worker |
+
+---
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview the production build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+---
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Project Structure
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+  app/          # Routes, providers, layout
+  pages/        # Dashboard, Budget, Bills, Timeline, Transactions, Settings
+  components/   # Shared and feature-specific UI components
+  domain/       # TypeScript models, constants, business rules
+  data/
+    repositories/   # Repository interfaces
+    local/          # Dexie DB schema + repository implementations
+  pwa/          # Service worker registration
+  utils/        # Shared utilities
+```
+
+---
+
+## Data Model
+
+All data is stored locally in IndexedDB (via Dexie). Nothing leaves your device.
+
+Key entities:
+- **BudgetMonth** — the active month's budget container
+- **BudgetGroup** — top-level grouping (e.g. Needs, Should Die)
+- **Category** — sub-grouping within a month (e.g. Groceries, Rent)
+- **BudgetItem** — a line item with planned amount, multiplier, split ratio, and optional bill flag
+- **RecurringTemplate** — blueprint for items that repeat every month
+- **Transaction** — a manual spend entry linked to a category and optionally a budget item
+- **BillTick** — tracks paid/unpaid state per bill per month
+
+Default budget groups seeded on first launch: **Needs** and **Should Die**.
+
+---
+
+## V1 Scope
+
+V1 is intentionally local-only. The following are not implemented and left as future phases:
+
+- CSV statement upload
+- Bank sync
+- Cash spending tracking
+- Cloud sync and authentication
+- Push notifications
+
+---
+
+## License
+
+Private — not for public distribution.
