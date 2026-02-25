@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { useAuth } from '../auth/useAuth'
 import { MonthSelector } from './MonthSelector'
 import { NavDrawer } from './NavDrawer'
 
 export function Layout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { dataVersion } = useAuth()
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -34,7 +36,7 @@ export function Layout() {
 
       {/* Main content */}
       <main className="flex-1">
-        <Outlet />
+        <Outlet key={dataVersion} />
       </main>
     </div>
   )

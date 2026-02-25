@@ -111,6 +111,17 @@ async function ensureSyncState(userId: string): Promise<SyncStateLocal> {
 }
 
 async function migrateLocalRowsToUser(userId: string): Promise<void> {
+  type TableWork = {
+    table: (typeof TABLE_ORDER)[number]
+    rows: LocalSyncRow[]
+    updatedAt: string
+  }
+
+  // Pass 1: Rescopeall __local__ rows locally before any cloud upload.
+  // This ensures local data is visible under the authenticated user's scope
+  // regardless of cloud sync outcome.
+  const workItems: TableWork[] = []
+
   for (const table of TABLE_ORDER) {
     const localTable = db.table(table.local)
     const localRows = (await localTable.toArray()).filter(
@@ -118,18 +129,21 @@ async function migrateLocalRowsToUser(userId: string): Promise<void> {
     )
     if (localRows.length === 0) continue
 
-    const cloudPayload = localRows.map((row) => toCloudRecord(table.local, row, userId))
+    const updatedAt = nowIso()
+    for (const row of localRows) {
+      await localTable.update(row.id, { userId, updatedAt })
+    }
+    workItems.push({ table, rows: localRows as LocalSyncRow[], updatedAt })
+  }
+
+  // Pass 2: Upload re-scoped rows to the cloud.
+  for (const { table, rows, updatedAt } of workItems) {
+    const cloudPayload = rows.map((row) =>
+      toCloudRecord(table.local, { ...row, updatedAt } as LocalSyncRow, userId),
+    )
     const { error } = await supabase.from(table.cloud).upsert(cloudPayload, { onConflict: 'id' })
     if (error) {
       throw new Error(`Silent upload failed for ${table.cloud}: ${error.message}`)
-    }
-
-    const updatedAt = nowIso()
-    for (const row of localRows) {
-      await localTable.update(row.id, {
-        userId,
-        updatedAt,
-      })
     }
   }
 }

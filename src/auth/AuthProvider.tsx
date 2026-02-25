@@ -20,16 +20,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(offlineMode ? 'offline' : 'idle')
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
+  const [dataVersion, setDataVersion] = useState(0)
 
   const runSync = useCallback(async () => {
     if (!user || offlineMode) return
     try {
       setSyncStatus('syncing')
       await orchestrator.runOnLogin(user.id)
+      // Set active user scope AFTER migration completes so UI queries see
+      // the migrated data on first render.
+      setActiveUserId(user.id)
+      setDataVersion((v) => v + 1)
       const state = await getSyncStateForUser(user.id)
       setLastSyncAt(state.lastSyncAt)
       setSyncStatus('synced')
     } catch {
+      // Even if cloud sync fails, local rows were re-scoped in pass 1 of
+      // migrateLocalRowsToUser, so set active user so the UI can see them.
+      setActiveUserId(user.id)
+      setDataVersion((v) => v + 1)
       setSyncStatus('error')
     }
   }, [offlineMode, user])
@@ -68,7 +77,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (user) {
-      setActiveUserId(user.id)
+      // Do NOT call setActiveUserId here. runSync will call it after
+      // migrateLocalRowsToUser has re-scoped the local rows, ensuring
+      // UI queries see the data on first render.
       void runSync()
       return
     }
@@ -156,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       offlineMode,
       syncStatus,
       lastSyncAt,
+      dataVersion,
       syncNow: runSync,
       signUp,
       signIn,
@@ -171,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       offlineMode,
       syncStatus,
       lastSyncAt,
+      dataVersion,
       runSync,
       signUp,
       signIn,
