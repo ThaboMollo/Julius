@@ -201,6 +201,8 @@ export function TransactionsPage() {
                     const category = categories.find((c) => c.id === tx.categoryId)
                     const item = items.find((i) => i.id === tx.budgetItemId)
 
+                    const isUncategorised = category?.name === 'Uncategorised'
+
                     return (
                       <div
                         key={tx.id}
@@ -210,9 +212,13 @@ export function TransactionsPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">
-                              {item?.name || category?.name || 'Unknown'}
+                              {isUncategorised ? tx.note || 'Uncategorised' : (item?.name || category?.name || 'Unknown')}
                             </span>
-                            {!tx.budgetItemId && (
+                            {isUncategorised ? (
+                              <span className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 px-1.5 py-0.5 rounded">
+                                Tap to categorise
+                              </span>
+                            ) : !tx.budgetItemId && (
                               <span className="text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
                                 Unbudgeted
                               </span>

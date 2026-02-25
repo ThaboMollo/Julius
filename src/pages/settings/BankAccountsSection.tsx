@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { bankConfigRepo, statementUploadRepo, transactionRepo, budgetMonthRepo, categoryRepo } from '../../data/local'
-import type { BankConfig, Category, CreateTransaction } from '../../domain/models'
+import type { BankConfig, CreateTransaction } from '../../domain/models'
 import { getParserForBank } from '../../data/parsers'
 import type { ParsedTransaction } from '../../data/parsers'
 import { reconcile } from '../../domain/rules/reconciliation'
-import { formatCurrency } from '../../domain/constants'
+import { formatCurrency, UNCATEGORISED_CATEGORY } from '../../domain/constants'
 
 const BANK_LABELS: Record<BankConfig['bankCode'], string> = {
   fnb: 'FNB',
@@ -31,7 +31,7 @@ interface ReconciliationState {
   filename: string
   matched: ParsedTransaction[]
   missing: ParsedTransaction[]
-  categories: Category[]
+  uncategorisedCatId: string
 }
 
 // ─────────────────────────────────────────────
@@ -90,48 +90,59 @@ export function BankAccountsSection() {
   }
 
   async function handleCSVUpload(bank: BankConfig, file: File) {
-    const csvText = await file.text()
-    const parser = getParserForBank(bank.bankCode)
-    const parsed = parser(csvText)
+    try {
+      const csvText = await file.text()
+      const parser = getParserForBank(bank.bankCode)
+      const parsed = parser(csvText)
 
-    if (parsed.length === 0) {
-      alert('No transactions found in this file. Please check the CSV format.')
-      return
+      if (parsed.length === 0) {
+        alert('No transactions found in this file. Please check the CSV format.')
+        return
+      }
+
+      // Load all Julius transactions for the period covered by the CSV
+      const dates = parsed.map((p) => new Date(p.date).getTime())
+      const minDate = new Date(Math.min(...dates))
+      const maxDate = new Date(Math.max(...dates))
+
+      // Collect Julius transactions for overlapping months
+      const allJuliusTxs = await loadTransactionsForRange(minDate, maxDate)
+      const result = reconcile(parsed, allJuliusTxs)
+
+      // Find (or fall back to first) uncategorised category
+      const cats = await categoryRepo.getActive()
+      const uncategorisedCat = cats.find((c) => c.name === UNCATEGORISED_CATEGORY) ?? cats[0]
+      if (!uncategorisedCat) {
+        alert('No categories found. Please set up your categories in Settings first.')
+        return
+      }
+
+      // Record the upload
+      await statementUploadRepo.create({
+        bankConfigId: bank.id,
+        filename: file.name,
+        uploadedAt: new Date(),
+        periodStart: minDate,
+        periodEnd: maxDate,
+        totalTransactions: parsed.length,
+        matchedCount: result.matched.length,
+        unmatchedCount: result.missingFromJulius.length,
+      })
+
+      await bankConfigRepo.update(bank.id, { lastUploadAt: new Date() })
+      await load()
+
+      setReconciliation({
+        bankConfigId: bank.id,
+        filename: file.name,
+        matched: result.matched,
+        missing: result.missingFromJulius,
+        uncategorisedCatId: uncategorisedCat.id,
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to process CSV.'
+      alert(`Upload error: ${msg}`)
     }
-
-    // Load all Julius transactions for the period covered by the CSV
-    const dates = parsed.map((p) => new Date(p.date).getTime())
-    const minDate = new Date(Math.min(...dates))
-    const maxDate = new Date(Math.max(...dates))
-
-    // Collect Julius transactions for overlapping months
-    const allJuliusTxs = await loadTransactionsForRange(minDate, maxDate)
-    const cats = await categoryRepo.getActive()
-    const result = reconcile(parsed, allJuliusTxs)
-
-    // Record the upload
-    await statementUploadRepo.create({
-      bankConfigId: bank.id,
-      filename: file.name,
-      uploadedAt: new Date(),
-      periodStart: minDate,
-      periodEnd: maxDate,
-      totalTransactions: parsed.length,
-      matchedCount: result.matched.length,
-      unmatchedCount: result.missingFromJulius.length,
-    })
-
-    // Update lastUploadAt
-    await bankConfigRepo.update(bank.id, { lastUploadAt: new Date() })
-    await load()
-
-    setReconciliation({
-      bankConfigId: bank.id,
-      filename: file.name,
-      matched: result.matched,
-      missing: result.missingFromJulius,
-      categories: cats,
-    })
   }
 
   async function loadTransactionsForRange(start: Date, end: Date) {
@@ -311,58 +322,38 @@ interface ReconciliationModalProps {
 }
 
 function ReconciliationModal({ state, onClose }: ReconciliationModalProps) {
-  const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [categoryMap, setCategoryMap] = useState<Record<number, string>>({})
   const [importing, setImporting] = useState(false)
-  const [done, setDone] = useState(false)
+  const [importedCount, setImportedCount] = useState<number | null>(null)
 
-  function toggleSelect(idx: number) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(idx)) {
-        next.delete(idx)
-      } else {
-        next.add(idx)
-      }
-      return next
-    })
-  }
-
-  function setCategory(idx: number, catId: string) {
-    setCategoryMap((prev) => ({ ...prev, [idx]: catId }))
-  }
-
-  async function importSelected() {
+  async function importAll() {
     setImporting(true)
     try {
-      for (const idx of Array.from(selected)) {
-        const tx = state.missing[idx]
-        const catId = categoryMap[idx]
-        if (!catId) continue
-
-        const txDate = new Date(tx.date)
-        const bm = await budgetMonthRepo.getOrCreate(
-          txDate.getFullYear(),
-          txDate.getMonth() + 1
-        )
-
-        const newTx: CreateTransaction = {
-          budgetMonthId: bm.id,
-          categoryId: catId,
-          budgetItemId: null,
-          amount: Math.abs(tx.amount),
-          date: txDate,
-          note: tx.description,
-        }
-        await transactionRepo.create(newTx)
-      }
-      setDone(true)
+      await Promise.all(
+        state.missing.map(async (tx) => {
+          const txDate = new Date(tx.date)
+          const bm = await budgetMonthRepo.getOrCreate(
+            txDate.getFullYear(),
+            txDate.getMonth() + 1,
+          )
+          const newTx: CreateTransaction = {
+            budgetMonthId: bm.id,
+            categoryId: state.uncategorisedCatId,
+            budgetItemId: null,
+            amount: Math.abs(tx.amount),
+            date: txDate,
+            note: tx.description,
+          }
+          await transactionRepo.create(newTx)
+        }),
+      )
+      setImportedCount(state.missing.length)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Import failed.'
+      alert(`Import error: ${msg}`)
     } finally {
       setImporting(false)
     }
   }
-
-  const selectedWithCategory = Array.from(selected).filter((idx) => categoryMap[idx])
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">
@@ -371,17 +362,20 @@ function ReconciliationModal({ state, onClose }: ReconciliationModalProps) {
         {/* Header */}
         <div className="flex justify-between items-start px-5 py-4 border-b dark:border-[#2E3A4E] shrink-0">
           <div>
-            <h2 className="text-lg font-bold text-gray-800 dark:text-[#F0EDE4]">Reconciliation</h2>
+            <h2 className="text-lg font-bold text-gray-800 dark:text-[#F0EDE4]">Statement Import</h2>
             <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">{state.filename}</p>
           </div>
           <button onClick={onClose} className="text-gray-400 dark:text-[#8A9BAA] text-2xl leading-none">✕</button>
         </div>
 
-        {done ? (
+        {importedCount !== null ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 gap-4">
             <div className="text-5xl">✅</div>
             <p className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">
-              {selectedWithCategory.length} transaction{selectedWithCategory.length !== 1 ? 's' : ''} imported
+              {importedCount} transaction{importedCount !== 1 ? 's' : ''} imported
+            </p>
+            <p className="text-sm text-gray-500 dark:text-[#8A9BAA] text-center">
+              All marked as Uncategorised. Tap each one in the Transactions page to assign a category.
             </p>
             <button
               onClick={onClose}
@@ -393,81 +387,40 @@ function ReconciliationModal({ state, onClose }: ReconciliationModalProps) {
         ) : (
           <>
             {/* Summary */}
-            <div className="flex gap-4 px-5 py-3 bg-gray-50 dark:bg-[#1E2330] shrink-0">
+            <div className="flex gap-6 px-5 py-3 bg-gray-50 dark:bg-[#1E2330] shrink-0">
               <div className="text-center">
                 <div className="text-lg font-bold text-green-500">{state.matched.length}</div>
-                <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">Matched</div>
+                <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">Already in Julius</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-yellow-500">{state.missing.length}</div>
-                <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">Missing from Julius</div>
+                <div className="text-lg font-bold text-[#C4A86B]">{state.missing.length}</div>
+                <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">New transactions</div>
               </div>
             </div>
 
-            {/* Missing transactions list */}
+            {/* Transaction list */}
             <div className="overflow-y-auto flex-1 p-4">
               {state.missing.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="text-3xl mb-2">✅</div>
-                  <p className="text-gray-600 dark:text-[#8A9BAA]">All bank transactions are in Julius.</p>
+                  <p className="text-gray-600 dark:text-[#8A9BAA]">All bank transactions are already in Julius.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-gray-700 dark:text-[#8A9BAA]">
-                    Select transactions to import:
-                  </p>
+                <div className="space-y-2">
                   {state.missing.map((tx, idx) => (
                     <div
                       key={idx}
-                      className={`border rounded-xl p-3 cursor-pointer transition-colors ${
-                        selected.has(idx)
-                          ? 'border-[#C4A86B] bg-[#C4A86B]/10'
-                          : 'border-gray-200 dark:border-[#2E3A4E]'
-                      }`}
-                      onClick={() => toggleSelect(idx)}
+                      className="border border-gray-200 dark:border-[#2E3A4E] rounded-xl px-3 py-2.5 flex justify-between items-center"
                     >
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <div
-                            className={`w-5 h-5 rounded border-2 shrink-0 flex items-center justify-center ${
-                              selected.has(idx)
-                                ? 'border-[#C4A86B] bg-[#C4A86B]'
-                                : 'border-gray-300 dark:border-[#4A5568]'
-                            }`}
-                          >
-                            {selected.has(idx) && (
-                              <span className="text-white text-xs leading-none">✓</span>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm text-gray-800 dark:text-[#F0EDE4] truncate">
-                              {tx.description}
-                            </div>
-                            <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
-                              {format(new Date(tx.date), 'd MMM yyyy')}
-                            </div>
-                          </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-gray-800 dark:text-[#F0EDE4] truncate">{tx.description}</div>
+                        <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
+                          {format(new Date(tx.date), 'd MMM yyyy')}
                         </div>
-                        <span className="text-sm font-medium text-gray-800 dark:text-[#F0EDE4] shrink-0 ml-2">
-                          {formatCurrency(Math.abs(tx.amount))}
-                        </span>
                       </div>
-
-                      {/* Category picker — only show when selected */}
-                      {selected.has(idx) && (
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <select
-                            value={categoryMap[idx] || ''}
-                            onChange={(e) => setCategory(idx, e.target.value)}
-                            className="w-full mt-1 px-2 py-1.5 text-sm border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#252D3D] text-gray-800 dark:text-[#F0EDE4]"
-                          >
-                            <option value="">— Assign category —</option>
-                            {state.categories.map((cat) => (
-                              <option key={cat.id} value={cat.id}>{cat.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      <span className="text-sm font-medium text-gray-800 dark:text-[#F0EDE4] shrink-0 ml-3">
+                        {formatCurrency(Math.abs(tx.amount))}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -476,21 +429,17 @@ function ReconciliationModal({ state, onClose }: ReconciliationModalProps) {
 
             {/* Footer */}
             {state.missing.length > 0 && (
-              <div className="px-5 py-4 border-t dark:border-[#2E3A4E] shrink-0">
+              <div className="px-5 py-4 border-t dark:border-[#2E3A4E] shrink-0 space-y-2">
                 <button
-                  onClick={importSelected}
-                  disabled={importing || selectedWithCategory.length === 0}
+                  onClick={importAll}
+                  disabled={importing}
                   className="w-full py-3 bg-[#A89060] hover:bg-[#8B7550] disabled:opacity-50 text-white rounded-xl font-semibold"
                 >
-                  {importing
-                    ? 'Importing...'
-                    : `Import ${selectedWithCategory.length} Selected`}
+                  {importing ? 'Importing...' : `Import ${state.missing.length} Transaction${state.missing.length !== 1 ? 's' : ''}`}
                 </button>
-                {selected.size > 0 && selectedWithCategory.length < selected.size && (
-                  <p className="text-xs text-yellow-500 text-center mt-2">
-                    {selected.size - selectedWithCategory.length} selected item{selected.size - selectedWithCategory.length !== 1 ? 's' : ''} need a category
-                  </p>
-                )}
+                <p className="text-xs text-gray-400 dark:text-[#8A9BAA] text-center">
+                  Imported as Uncategorised — categorise later in Transactions
+                </p>
               </div>
             )}
           </>

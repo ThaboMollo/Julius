@@ -75,9 +75,7 @@ function parseFNBDate(s: string): Date | null {
   // dd/mm/yyyy
   const match3 = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
   if (match3) {
-    return new Date(parseInt(match3[2]) - 1 === parseInt(match3[1]) ? parseInt(match3[2]) : parseInt(match3[2]) - 1 + 1,
-      parseInt(match3[1]) - 1,
-      parseInt(match3[0]))
+    return new Date(parseInt(match3[3]), parseInt(match3[2]) - 1, parseInt(match3[1]))
   }
 
   const fallback = new Date(clean)

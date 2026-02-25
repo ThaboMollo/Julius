@@ -2,6 +2,7 @@
 export const DEFAULT_GROUPS = [
   { name: 'Needs', sortOrder: 1 },
   { name: 'Should Die', sortOrder: 2 },
+  { name: 'Imports', sortOrder: 3 },
 ] as const
 
 // Default Categories by Group
@@ -22,7 +23,13 @@ export const DEFAULT_CATEGORIES = {
     'Shopping',
     'Personal Care',
   ],
+  'Imports': [
+    'Uncategorised',
+  ],
 } as const
+
+// Sentinel category name used for transactions imported from bank statements
+export const UNCATEGORISED_CATEGORY = 'Uncategorised'
 
 // App defaults
 export const DEFAULT_PAYDAY_DAY = 25
