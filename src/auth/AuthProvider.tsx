@@ -3,7 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { onSupabaseAuthStateChange, supabase } from '../cloud/supabaseClient'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../config/flags'
 import { AuthContext } from './context'
-import { clearActiveUserId, LOCAL_USER_ID, setActiveUserId } from './userScope'
+import { LOCAL_USER_ID, setActiveUserId } from './userScope'
 import { SyncOrchestrator, getSyncStateForUser, type SyncStatus } from '../sync/SyncOrchestrator'
 
 const OFFLINE_MODE_KEY = 'julius-offline-mode'
@@ -44,8 +44,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [offlineMode, user])
 
   useEffect(() => {
-    if (!ENABLE_AUTH || !ENABLE_SUPABASE || offlineMode) {
+    if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
+      // Auth is fully disabled — always use local scope.
       setActiveUserId(LOCAL_USER_ID)
+      return
+    }
+    if (offlineMode) {
+      // Don't reset activeUserId here. After migration, data is scoped to
+      // user.id. Resetting to __local__ would make it invisible offline.
       return
     }
 
@@ -72,19 +78,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (offlineMode) {
-      setActiveUserId(LOCAL_USER_ID)
+      // Don't touch activeUserId — migrated data is scoped to user.id and
+      // must remain visible when the user goes offline or logs out.
       return
     }
 
     if (user) {
-      // Do NOT call setActiveUserId here. runSync will call it after
-      // migrateLocalRowsToUser has re-scoped the local rows, ensuring
-      // UI queries see the data on first render.
+      // runSync sets activeUserId after migrateLocalRowsToUser completes.
       void runSync()
       return
     }
 
-    clearActiveUserId()
+    // user is null (session expired / not logged in). Keep the existing
+    // activeUserId so migrated data remains accessible. Only if no real
+    // user has ever logged in will this still be __local__.
   }, [offlineMode, runSync, user])
 
   async function signUp(email: string, password: string) {
@@ -145,7 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null)
     setUser(null)
     setAuthLoading(false)
-    setActiveUserId(LOCAL_USER_ID)
+    // Do NOT reset activeUserId. After first login, data is scoped to user.id.
+    // Resetting to __local__ here would make all migrated data invisible offline.
     setSyncStatus('offline')
     setLastSyncAt(null)
   }
