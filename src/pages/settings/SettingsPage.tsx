@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   budgetGroupRepo,
   categoryRepo,
@@ -17,9 +18,14 @@ import type {
 } from '../../domain/models'
 import { formatCurrency } from '../../domain/constants'
 import { useTheme } from '../../app/ThemeContext'
+import { ENABLE_AUTH, ENABLE_SYNC, ENABLE_SUPABASE } from '../../config/flags'
+import { useAuth } from '../../auth/useAuth'
 
 export function SettingsPage() {
   const { isDark, toggleTheme } = useTheme()
+  const { user, offlineMode, signOut, continueOffline, resumeOnline, syncStatus, lastSyncAt, syncNow } = useAuth()
+  const [syncMessage, setSyncMessage] = useState('')
+  const [syncing, setSyncing] = useState(false)
   const [loading, setLoading] = useState(true)
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [groups, setGroups] = useState<BudgetGroup[]>([])
@@ -131,6 +137,25 @@ export function SettingsPage() {
     await loadData()
   }
 
+  async function handleManualSync() {
+    if (!user) {
+      setSyncMessage('Sign in first to run cloud sync.')
+      return
+    }
+
+    setSyncing(true)
+    setSyncMessage('Sync in progress...')
+    try {
+      await syncNow()
+      setSyncMessage('Sync complete.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Sync failed.'
+      setSyncMessage(message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loading || !settings) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -142,6 +167,78 @@ export function SettingsPage() {
   return (
     <div className="p-4 space-y-6 pb-24">
       <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Settings</h1>
+
+      {ENABLE_AUTH && ENABLE_SUPABASE && (
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4 space-y-3">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Account</h2>
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+            {offlineMode
+              ? 'Offline mode is active. Local data is still fully available.'
+              : user
+                ? `Signed in as ${user.email ?? 'your account'}.`
+                : 'Not signed in.'}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+            Cloud backup status:{' '}
+            {offlineMode
+              ? 'Offline'
+              : syncStatus === 'syncing'
+                ? 'Syncing...'
+                : syncStatus === 'synced'
+                  ? `Synced ✅${lastSyncAt ? ` (${new Date(lastSyncAt).toLocaleString()})` : ''}`
+                  : syncStatus === 'error'
+                    ? 'Sync failed (will retry on login)'
+                    : 'Idle'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {!offlineMode && user && (
+              <button
+                type="button"
+                onClick={() => void signOut()}
+                className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800"
+              >
+                Logout
+              </button>
+            )}
+            {!offlineMode ? (
+              <button
+                type="button"
+                onClick={continueOffline}
+                className="px-3 py-2 bg-gray-200 dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] rounded-lg"
+              >
+                Continue offline
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={resumeOnline}
+                className="px-3 py-2 border border-[#A89060] text-[#A89060] rounded-lg hover:bg-[#F5EFE2]"
+              >
+                Resume online
+              </button>
+            )}
+            {!user && !offlineMode && (
+              <Link
+                to="/login"
+                className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
+              >
+                Login
+              </Link>
+            )}
+            {ENABLE_SYNC && user && !offlineMode && (
+              <button
+                type="button"
+                onClick={() => void handleManualSync()}
+                disabled={syncing}
+                className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] disabled:opacity-60"
+              >
+                {syncing ? 'Syncing...' : 'Sync now'}
+              </button>
+            )}
+          </div>
+          {ENABLE_SYNC && <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">{syncMessage}</p>}
+        </div>
+      )}
 
       {/* Appearance */}
       <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
