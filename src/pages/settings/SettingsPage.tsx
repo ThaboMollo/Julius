@@ -18,7 +18,7 @@ import type {
 } from '../../domain/models'
 import { formatCurrency } from '../../domain/constants'
 import { useTheme } from '../../app/ThemeContext'
-import { ENABLE_AUTH, ENABLE_SYNC, ENABLE_SUPABASE } from '../../config/flags'
+import { ENABLE_AUTH, ENABLE_SUPABASE } from '../../config/flags'
 import { useAuth } from '../../auth/useAuth'
 
 export function SettingsPage() {
@@ -187,7 +187,7 @@ export function SettingsPage() {
                 : syncStatus === 'synced'
                   ? `Synced ✅${lastSyncAt ? ` (${new Date(lastSyncAt).toLocaleString()})` : ''}`
                   : syncStatus === 'error'
-                    ? 'Sync failed (will retry on login)'
+                    ? 'Sync failed — tap Sync now to retry'
                     : 'Idle'}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -225,7 +225,7 @@ export function SettingsPage() {
                 Login
               </Link>
             )}
-            {ENABLE_SYNC && user && !offlineMode && (
+            {user && !offlineMode && (
               <button
                 type="button"
                 onClick={() => void handleManualSync()}
@@ -236,7 +236,7 @@ export function SettingsPage() {
               </button>
             )}
           </div>
-          {ENABLE_SYNC && <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">{syncMessage}</p>}
+          {syncMessage && <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">{syncMessage}</p>}
         </div>
       )}
 
