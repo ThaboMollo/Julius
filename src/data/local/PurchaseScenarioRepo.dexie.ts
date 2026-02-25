@@ -1,5 +1,6 @@
 import { db } from './db'
 import type { PurchaseScenario, CreatePurchaseScenario } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -7,30 +8,29 @@ function generateId(): string {
 
 export const purchaseScenarioRepo = {
   async getAll(): Promise<PurchaseScenario[]> {
-    return db.purchaseScenarios.toArray()
+    return forActiveUser(await db.purchaseScenarios.toArray())
   },
 
   async getById(id: string): Promise<PurchaseScenario | undefined> {
-    return db.purchaseScenarios.get(id)
+    const row = await db.purchaseScenarios.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async create(data: CreatePurchaseScenario): Promise<PurchaseScenario> {
-    const now = new Date()
     const scenario: PurchaseScenario = {
-      ...data,
+      ...stampNew(data),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.purchaseScenarios.add(scenario)
     return scenario
   },
 
   async update(id: string, updates: Partial<PurchaseScenario>): Promise<void> {
-    await db.purchaseScenarios.update(id, { ...updates, updatedAt: new Date() })
+    await db.purchaseScenarios.update(id, stampUpdate(updates))
   },
 
   async delete(id: string): Promise<void> {
-    await db.purchaseScenarios.delete(id)
+    await db.purchaseScenarios.update(id, stampSoftDelete())
   },
 }

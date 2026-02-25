@@ -3,13 +3,17 @@ import { budgetGroupRepo } from './BudgetGroupRepo.dexie'
 import { categoryRepo } from './CategoryRepo.dexie'
 import { settingsRepo } from './SettingsRepo.dexie'
 import { DEFAULT_GROUPS, DEFAULT_CATEGORIES } from '../../domain/constants'
+import { activeUserId } from './scoped'
 
 export async function seedDefaults(): Promise<void> {
+  const userId = activeUserId()
   const groupMap = new Map<string, string>()
 
-  // Seed each default group only if one with that name doesn't already exist
   for (const groupDef of DEFAULT_GROUPS) {
-    const existing = await db.budgetGroups.where('name').equals(groupDef.name).first()
+    const existing = (await db.budgetGroups.where('name').equals(groupDef.name).toArray()).find(
+      (group) => group.userId === userId && group.deletedAt === null,
+    )
+
     if (existing) {
       groupMap.set(groupDef.name, existing.id)
     } else {
@@ -23,15 +27,15 @@ export async function seedDefaults(): Promise<void> {
     }
   }
 
-  // Seed each default category only if one with that name doesn't already exist in that group
   for (const [groupName, categoryNames] of Object.entries(DEFAULT_CATEGORIES)) {
     const groupId = groupMap.get(groupName)
     if (!groupId) continue
+
     for (const categoryName of categoryNames) {
-      const existing = await db.categories
-        .where('groupId').equals(groupId)
-        .filter(c => c.name === categoryName)
-        .first()
+      const existing = (await db.categories.where('groupId').equals(groupId).toArray()).find(
+        (category) => category.userId === userId && category.deletedAt === null && category.name === categoryName,
+      )
+
       if (!existing) {
         await categoryRepo.create({
           name: categoryName,
@@ -43,6 +47,5 @@ export async function seedDefaults(): Promise<void> {
     }
   }
 
-  // Ensure settings exist
   await settingsRepo.get()
 }

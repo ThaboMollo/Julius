@@ -1,6 +1,7 @@
 import { db } from './db'
 import type { ICategoryRepo } from '../repositories/CategoryRepo'
 import type { Category, CreateCategory } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -8,49 +9,51 @@ function generateId(): string {
 
 export const categoryRepo: ICategoryRepo = {
   async getAll(): Promise<Category[]> {
-    return db.categories.toArray()
+    return forActiveUser(await db.categories.toArray())
   },
 
   async getActive(): Promise<Category[]> {
-    const all = await db.categories.toArray()
-    return all.filter((c) => c.isActive)
+    return (await this.getAll()).filter((c) => c.isActive)
   },
 
   async getByGroup(groupId: string): Promise<Category[]> {
-    return db.categories.where('groupId').equals(groupId).toArray()
+    return (await this.getAll()).filter((c) => c.groupId === groupId)
   },
 
   async getById(id: string): Promise<Category | undefined> {
-    return db.categories.get(id)
+    const row = await db.categories.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async create(category: CreateCategory): Promise<Category> {
-    const now = new Date()
     const newCategory: Category = {
-      ...category,
+      ...stampNew(category),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.categories.add(newCategory)
     return newCategory
   },
 
   async update(id: string, updates: Partial<Category>): Promise<void> {
-    await db.categories.update(id, {
-      ...updates,
-      updatedAt: new Date(),
-    })
+    await db.categories.update(id, stampUpdate(updates))
   },
 
   async delete(id: string): Promise<void> {
-    await db.categories.delete(id)
+    await db.categories.update(id, stampSoftDelete())
   },
 
   async hasReferences(id: string): Promise<boolean> {
-    const itemCount = await db.budgetItems.where('categoryId').equals(id).count()
-    const txCount = await db.transactions.where('categoryId').equals(id).count()
-    const templateCount = await db.recurringTemplates.where('categoryId').equals(id).count()
+    const userId = activeUserId()
+    const itemCount = (await db.budgetItems.where('categoryId').equals(id).toArray()).filter(
+      (x) => x.userId === userId && x.deletedAt === null,
+    ).length
+    const txCount = (await db.transactions.where('categoryId').equals(id).toArray()).filter(
+      (x) => x.userId === userId && x.deletedAt === null,
+    ).length
+    const templateCount = (await db.recurringTemplates.where('categoryId').equals(id).toArray()).filter(
+      (x) => x.userId === userId && x.deletedAt === null,
+    ).length
     return itemCount > 0 || txCount > 0 || templateCount > 0
   },
 }

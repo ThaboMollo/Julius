@@ -1,6 +1,7 @@
 import { db } from './db'
 import type { IBillTickRepo } from '../repositories/BillTickRepo'
 import type { BillTick, CreateBillTick } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -8,40 +9,38 @@ function generateId(): string {
 
 export const billTickRepo: IBillTickRepo = {
   async getByMonth(budgetMonthId: string): Promise<BillTick[]> {
-    return db.billTicks.where('budgetMonthId').equals(budgetMonthId).toArray()
+    return (await forActiveUser(await db.billTicks.where('budgetMonthId').equals(budgetMonthId).toArray()))
   },
 
   async getByMonthAndItem(
     budgetMonthId: string,
-    budgetItemId: string
+    budgetItemId: string,
   ): Promise<BillTick | undefined> {
-    return db.billTicks
+    const userId = activeUserId()
+    const found = await db.billTicks
       .where('[budgetMonthId+budgetItemId]')
       .equals([budgetMonthId, budgetItemId])
-      .first()
+      .toArray()
+    return found.find((row) => row.userId === userId && row.deletedAt === null)
   },
 
   async getById(id: string): Promise<BillTick | undefined> {
-    return db.billTicks.get(id)
+    const row = await db.billTicks.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async create(billTick: CreateBillTick): Promise<BillTick> {
-    const now = new Date()
     const newBillTick: BillTick = {
-      ...billTick,
+      ...stampNew(billTick),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.billTicks.add(newBillTick)
     return newBillTick
   },
 
   async update(id: string, updates: Partial<BillTick>): Promise<void> {
-    await db.billTicks.update(id, {
-      ...updates,
-      updatedAt: new Date(),
-    })
+    await db.billTicks.update(id, stampUpdate(updates))
   },
 
   async togglePaid(budgetMonthId: string, budgetItemId: string): Promise<BillTick> {
@@ -49,18 +48,18 @@ export const billTickRepo: IBillTickRepo = {
 
     if (existing) {
       const newIsPaid = !existing.isPaid
+      const paidAt = newIsPaid ? new Date() : null
       await this.update(existing.id, {
         isPaid: newIsPaid,
-        paidAt: newIsPaid ? new Date() : null,
+        paidAt,
       })
       return {
         ...existing,
         isPaid: newIsPaid,
-        paidAt: newIsPaid ? new Date() : null,
+        paidAt,
       }
     }
 
-    // Create a new tick marked as paid
     return this.create({
       budgetMonthId,
       budgetItemId,
@@ -70,10 +69,11 @@ export const billTickRepo: IBillTickRepo = {
   },
 
   async delete(id: string): Promise<void> {
-    await db.billTicks.delete(id)
+    await db.billTicks.update(id, stampSoftDelete())
   },
 
   async deleteByMonth(budgetMonthId: string): Promise<void> {
-    await db.billTicks.where('budgetMonthId').equals(budgetMonthId).delete()
+    const matches = await this.getByMonth(budgetMonthId)
+    await Promise.all(matches.map((row) => db.billTicks.update(row.id, stampSoftDelete())))
   },
 }

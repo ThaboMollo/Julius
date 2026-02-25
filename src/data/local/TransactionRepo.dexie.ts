@@ -1,6 +1,7 @@
 import { db } from './db'
 import type { ITransactionRepo } from '../repositories/TransactionRepo'
 import type { Transaction, CreateTransaction } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -8,59 +9,60 @@ function generateId(): string {
 
 export const transactionRepo: ITransactionRepo = {
   async getAll(): Promise<Transaction[]> {
-    return db.transactions.toArray()
+    return forActiveUser(await db.transactions.toArray())
   },
 
   async getByMonth(budgetMonthId: string): Promise<Transaction[]> {
-    return db.transactions
-      .where('budgetMonthId')
-      .equals(budgetMonthId)
-      .toArray()
+    return (await this.getAll()).filter((tx) => tx.budgetMonthId === budgetMonthId)
   },
 
   async getByCategory(categoryId: string): Promise<Transaction[]> {
-    return db.transactions.where('categoryId').equals(categoryId).toArray()
+    return (await this.getAll()).filter((tx) => tx.categoryId === categoryId)
   },
 
   async getByItem(budgetItemId: string): Promise<Transaction[]> {
-    return db.transactions.where('budgetItemId').equals(budgetItemId).toArray()
+    return (await this.getAll()).filter((tx) => tx.budgetItemId === budgetItemId)
   },
 
   async getByDateRange(startDate: Date, endDate: Date): Promise<Transaction[]> {
-    return db.transactions
-      .where('date')
-      .between(startDate, endDate, true, true)
-      .toArray()
+    const start = startDate.getTime()
+    const end = endDate.getTime()
+    return (await this.getAll()).filter((tx) => {
+      const time = new Date(tx.date).getTime()
+      return time >= start && time <= end
+    })
   },
 
   async getById(id: string): Promise<Transaction | undefined> {
-    return db.transactions.get(id)
+    const row = await db.transactions.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async create(transaction: CreateTransaction): Promise<Transaction> {
-    const now = new Date()
     const newTransaction: Transaction = {
-      ...transaction,
+      ...stampNew(transaction),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.transactions.add(newTransaction)
     return newTransaction
   },
 
   async update(id: string, updates: Partial<Transaction>): Promise<void> {
-    await db.transactions.update(id, {
-      ...updates,
-      updatedAt: new Date(),
-    })
+    await db.transactions.update(id, stampUpdate(updates))
   },
 
   async delete(id: string): Promise<void> {
-    await db.transactions.delete(id)
+    await db.transactions.update(id, stampSoftDelete())
   },
 
   async deleteByMonth(budgetMonthId: string): Promise<void> {
-    await db.transactions.where('budgetMonthId').equals(budgetMonthId).delete()
+    const matches = await db.transactions.where('budgetMonthId').equals(budgetMonthId).toArray()
+    const userId = activeUserId()
+    await Promise.all(
+      matches
+        .filter((tx) => tx.userId === userId && tx.deletedAt === null)
+        .map((tx) => db.transactions.update(tx.id, stampSoftDelete())),
+    )
   },
 }

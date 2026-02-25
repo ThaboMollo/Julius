@@ -2,6 +2,7 @@ import { format } from 'date-fns'
 import { db } from './db'
 import type { IBudgetMonthRepo } from '../repositories/BudgetMonthRepo'
 import type { BudgetMonth, CreateBudgetMonth } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -9,15 +10,17 @@ function generateId(): string {
 
 export const budgetMonthRepo: IBudgetMonthRepo = {
   async getAll(): Promise<BudgetMonth[]> {
-    return db.budgetMonths.toArray()
+    return forActiveUser(await db.budgetMonths.toArray())
   },
 
   async getByKey(monthKey: string): Promise<BudgetMonth | undefined> {
-    return db.budgetMonths.where('monthKey').equals(monthKey).first()
+    return (await this.getAll()).find((m) => m.monthKey === monthKey)
   },
 
   async getById(id: string): Promise<BudgetMonth | undefined> {
-    return db.budgetMonths.get(id)
+    const row = await db.budgetMonths.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async getOrCreate(year: number, month: number): Promise<BudgetMonth> {
@@ -28,36 +31,28 @@ export const budgetMonthRepo: IBudgetMonthRepo = {
       return existing
     }
 
-    const newMonth = await this.create({
+    return this.create({
       year,
       month,
       monthKey,
       expectedIncome: null,
     })
-
-    return newMonth
   },
 
   async create(budgetMonth: CreateBudgetMonth): Promise<BudgetMonth> {
-    const now = new Date()
     const newMonth: BudgetMonth = {
-      ...budgetMonth,
+      ...stampNew(budgetMonth),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.budgetMonths.add(newMonth)
     return newMonth
   },
 
   async update(id: string, updates: Partial<BudgetMonth>): Promise<void> {
-    await db.budgetMonths.update(id, {
-      ...updates,
-      updatedAt: new Date(),
-    })
+    await db.budgetMonths.update(id, stampUpdate(updates))
   },
 
   async delete(id: string): Promise<void> {
-    await db.budgetMonths.delete(id)
+    await db.budgetMonths.update(id, stampSoftDelete())
   },
 }

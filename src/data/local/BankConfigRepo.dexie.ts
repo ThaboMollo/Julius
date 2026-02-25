@@ -1,5 +1,6 @@
 import { db } from './db'
 import type { BankConfig, CreateBankConfig } from '../../domain/models'
+import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -7,34 +8,33 @@ function generateId(): string {
 
 export const bankConfigRepo = {
   async getAll(): Promise<BankConfig[]> {
-    return db.bankConfigs.toArray()
+    return forActiveUser(await db.bankConfigs.toArray())
   },
 
   async getActive(): Promise<BankConfig[]> {
-    return db.bankConfigs.filter((b) => b.isActive).toArray()
+    return (await this.getAll()).filter((b) => b.isActive)
   },
 
   async getById(id: string): Promise<BankConfig | undefined> {
-    return db.bankConfigs.get(id)
+    const row = await db.bankConfigs.get(id)
+    if (!row) return undefined
+    return row.userId === activeUserId() && row.deletedAt === null ? row : undefined
   },
 
   async create(data: CreateBankConfig): Promise<BankConfig> {
-    const now = new Date()
     const config: BankConfig = {
-      ...data,
+      ...stampNew(data),
       id: generateId(),
-      createdAt: now,
-      updatedAt: now,
     }
     await db.bankConfigs.add(config)
     return config
   },
 
   async update(id: string, updates: Partial<BankConfig>): Promise<void> {
-    await db.bankConfigs.update(id, { ...updates, updatedAt: new Date() })
+    await db.bankConfigs.update(id, stampUpdate(updates))
   },
 
   async delete(id: string): Promise<void> {
-    await db.bankConfigs.delete(id)
+    await db.bankConfigs.update(id, stampSoftDelete())
   },
 }
