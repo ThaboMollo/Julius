@@ -1,45 +1,53 @@
 import { useState } from 'react'
-import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../auth/useAuth'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../../config/flags'
 
-export function LoginPage() {
-  const location = useLocation()
+export function RegisterPage() {
   const navigate = useNavigate()
-  const { user, loading, offlineMode, signIn, continueOffline, resumeOnline } = useAuth()
+  const { user, offlineMode, signUp } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  const redirectPath = (location.state as { from?: string } | null)?.from ?? '/dashboard'
 
   if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
     return <Navigate to="/dashboard" replace />
   }
 
-  if (user && !offlineMode && !loading) {
-    return <Navigate to={redirectPath} replace />
+  if (user && !offlineMode) {
+    return <Navigate to="/dashboard" replace />
   }
 
-  async function submitLogin() {
+  async function submitRegister() {
     if (!email.trim()) {
-      setMessage('Enter your email address first.')
+      setMessage('Enter your email address.')
       return
     }
     if (!password) {
-      setMessage('Enter your password.')
+      setMessage('Enter a password.')
+      return
+    }
+    if (password.length < 6) {
+      setMessage('Password must be at least 6 characters.')
+      return
+    }
+    if (password !== confirmPassword) {
+      setMessage('Passwords do not match.')
       return
     }
 
     setSubmitting(true)
     setMessage('')
+
     try {
-      await signIn(email.trim(), password)
-      setMessage('Signed in successfully.')
+      await signUp(email.trim(), password)
+      setMessage('Account created. If email confirmation is enabled, check your inbox before logging in.')
+      setTimeout(() => navigate('/login', { replace: true }), 1200)
     } catch (error) {
-      const next = error instanceof Error ? error.message : 'Could not sign in.'
+      const next = error instanceof Error ? error.message : 'Could not create account.'
       setMessage(next)
     } finally {
       setSubmitting(false)
@@ -49,9 +57,9 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-[#1E2330] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-white dark:bg-[#252D3D] rounded-2xl shadow p-6 space-y-4">
-        <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Login</h1>
+        <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Register</h1>
         <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
-          Use email + password for cloud backup and sync. You can continue offline without signing in.
+          Create an account to enable cloud backup and cross-device sync.
         </p>
 
         <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4]">Email</label>
@@ -69,53 +77,32 @@ export function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-[#1E2330] dark:border-[#2E3A4E] text-gray-800 dark:text-[#F0EDE4]"
-          placeholder="Enter password"
+          placeholder="At least 6 characters"
+        />
+
+        <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4]">Confirm Password</label>
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          className="w-full px-3 py-2 border rounded-lg bg-white dark:bg-[#1E2330] dark:border-[#2E3A4E] text-gray-800 dark:text-[#F0EDE4]"
+          placeholder="Re-enter password"
         />
 
         <button
           type="button"
-          onClick={() => void submitLogin()}
+          onClick={() => void submitRegister()}
           disabled={submitting}
           className="w-full py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] disabled:opacity-60"
         >
-          {submitting ? 'Working...' : 'Login'}
+          {submitting ? 'Creating account...' : 'Create Account'}
         </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            continueOffline()
-            navigate('/dashboard', { replace: true })
-          }}
-          className="w-full py-2 bg-gray-200 dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] rounded-lg"
-        >
-          Continue offline without login
-        </button>
-
-        {offlineMode && (
-          <button
-            type="button"
-            onClick={resumeOnline}
-            className="w-full py-2 border border-[#A89060] text-[#A89060] rounded-lg hover:bg-[#F5EFE2]"
-          >
-            Resume online mode
-          </button>
-        )}
 
         <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">{message}</p>
 
-        <div className="flex justify-between text-sm">
-          <Link to="/register" className="text-[#A89060] hover:underline">
-            Create account
-          </Link>
-          <Link to="/forgot-password" className="text-[#A89060] hover:underline">
-            Forgot password?
-          </Link>
-        </div>
-
         <div className="text-sm">
-          <Link to="/dashboard" className="text-[#A89060] hover:underline">
-            Back to app
+          <Link to="/login" className="text-[#A89060] hover:underline">
+            Back to login
           </Link>
         </div>
       </div>

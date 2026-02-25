@@ -25,14 +25,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || offlineMode) return
     try {
       setSyncStatus('syncing')
-      await orchestrator.runOnLogin(user.id, session)
+      await orchestrator.runOnLogin(user.id)
       const state = await getSyncStateForUser(user.id)
       setLastSyncAt(state.lastSyncAt)
       setSyncStatus('synced')
     } catch {
       setSyncStatus('error')
     }
-  }, [offlineMode, session, user])
+  }, [offlineMode, user])
 
   useEffect(() => {
     if (!ENABLE_AUTH || !ENABLE_SUPABASE || offlineMode) {
@@ -76,7 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearActiveUserId()
   }, [offlineMode, runSync, user])
 
-  async function signInWithOtp(email: string) {
+  async function signUp(email: string, password: string) {
     if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
       throw new Error('Auth is disabled by feature flag.')
     }
@@ -84,11 +84,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(OFFLINE_MODE_KEY)
     setOfflineMode(false)
 
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signUp({
       email,
-      options: {
-        emailRedirectTo: window.location.origin,
-      },
+      password,
+    })
+
+    if (error) throw error
+  }
+
+  async function signIn(email: string, password: string) {
+    if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
+      throw new Error('Auth is disabled by feature flag.')
+    }
+
+    localStorage.removeItem(OFFLINE_MODE_KEY)
+    setOfflineMode(false)
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     })
 
     if (error) throw error
@@ -101,6 +115,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw error
     }
     continueOffline()
+  }
+
+  async function resetPassword(email: string) {
+    if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
+      throw new Error('Auth is disabled by feature flag.')
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    })
+    if (error) throw error
   }
 
   function continueOffline() {
@@ -132,7 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       syncStatus,
       lastSyncAt,
       syncNow: runSync,
-      signInWithOtp,
+      signUp,
+      signIn,
+      resetPassword,
       signOut,
       continueOffline,
       resumeOnline,
@@ -145,7 +172,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       syncStatus,
       lastSyncAt,
       runSync,
-      signInWithOtp,
+      signUp,
+      signIn,
+      resetPassword,
       signOut,
       continueOffline,
       resumeOnline,

@@ -13,7 +13,14 @@ if (ENABLE_SUPABASE && (!supabaseUrl || !supabaseAnonKey)) {
 const clientUrl = supabaseUrl ?? 'http://localhost:54321'
 const clientAnonKey = supabaseAnonKey ?? 'placeholder-anon-key'
 
-export const supabase = createClient(clientUrl, clientAnonKey)
+export const supabase = createClient(clientUrl, clientAnonKey, {
+  auth: {
+    detectSessionInUrl: false,
+    persistSession: true,
+    autoRefreshToken: true,
+    storage: localStorage,
+  },
+})
 
 export function onSupabaseAuthStateChange(
   callback: (event: AuthChangeEvent, session: Session | null) => void,

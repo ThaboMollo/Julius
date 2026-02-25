@@ -8,6 +8,8 @@ import { TimelinePage } from './pages/timeline/TimelinePage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
 import { LoginPage } from './pages/auth/LoginPage'
+import { RegisterPage } from './pages/auth/RegisterPage'
+import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { PlannerPage } from './pages/planner/PlannerPage'
 import { MonthProvider } from './app/MonthContext'
@@ -32,6 +34,8 @@ function App() {
     <MonthProvider>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/" element={<Layout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
