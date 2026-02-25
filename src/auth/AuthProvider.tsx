@@ -34,9 +34,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const state = await getSyncStateForUser(user.id)
       setLastSyncAt(state.lastSyncAt)
       setSyncStatus('synced')
-    } catch {
+    } catch (err) {
       // Even if cloud sync fails, local rows were re-scoped in pass 1 of
       // migrateLocalRowsToUser, so set active user so the UI can see them.
+      console.error('[Julius] Sync failed:', err)
       setActiveUserId(user.id)
       setDataVersion((v) => v + 1)
       setSyncStatus('error')
