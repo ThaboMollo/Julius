@@ -1,4 +1,3 @@
-import type { Session } from '@supabase/supabase-js'
 import { db } from '../data/local'
 import { supabase } from '../cloud/supabaseClient'
 import type {
@@ -40,8 +39,7 @@ type SyncStatus = 'idle' | 'syncing' | 'synced' | 'offline' | 'error'
 export class SyncOrchestrator {
   private inFlightByUser = new Map<string, Promise<void>>()
 
-  async runOnLogin(userId: string, session: Session | null): Promise<void> {
-    void session
+  async runOnLogin(userId: string): Promise<void> {
     if (this.inFlightByUser.has(userId)) {
       await this.inFlightByUser.get(userId)
       return
@@ -115,7 +113,9 @@ async function ensureSyncState(userId: string): Promise<SyncStateLocal> {
 async function migrateLocalRowsToUser(userId: string): Promise<void> {
   for (const table of TABLE_ORDER) {
     const localTable = db.table(table.local)
-    const localRows = (await localTable.toArray()).filter((row) => row.userId === '__local__')
+    const localRows = (await localTable.toArray()).filter(
+      (row) => row.userId === '__local__' && row.deletedAt === null,
+    )
     if (localRows.length === 0) continue
 
     const cloudPayload = localRows.map((row) => toCloudRecord(table.local, row, userId))
