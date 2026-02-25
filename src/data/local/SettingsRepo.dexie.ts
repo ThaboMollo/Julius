@@ -24,6 +24,19 @@ export const settingsRepo: ISettingsRepo = {
       return existing
     }
 
+    // Backward-compat: migrate legacy single-record settings row without scoped id.
+    const legacy = await db.appSettings.get(SETTINGS_ID)
+    if (legacy && legacy.deletedAt === null && legacy.userId === activeUserId()) {
+      const migrated: AppSettings = {
+        ...legacy,
+        id: scopedId,
+        updatedAt: nowIso(),
+      }
+      await db.appSettings.delete(SETTINGS_ID)
+      await db.appSettings.put(migrated)
+      return migrated
+    }
+
     const defaultSettings: AppSettings = {
       ...stampNew({
         paydayDayOfMonth: DEFAULT_PAYDAY_DAY,
