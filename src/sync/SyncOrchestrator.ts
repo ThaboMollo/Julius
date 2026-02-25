@@ -202,7 +202,7 @@ async function deduplicateLocalData(userId: string): Promise<void> {
     withCounts.sort(
       (a, b) =>
         b.itemCount - a.itemCount ||
-        a.month.createdAt.localeCompare(b.month.createdAt),
+        String(a.month.createdAt ?? '').localeCompare(String(b.month.createdAt ?? '')),
     )
 
     const keep = withCounts[0].month
@@ -250,7 +250,7 @@ async function deduplicateLocalData(userId: string): Promise<void> {
     if (groups.length <= 1) continue
 
     // Keep oldest (original migrated data has the earliest createdAt).
-    groups.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    groups.sort((a, b) => String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? '')))
     const keep = groups[0]
     const ghosts = groups.slice(1)
 

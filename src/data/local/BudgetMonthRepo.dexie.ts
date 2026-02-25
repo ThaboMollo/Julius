@@ -45,7 +45,7 @@ export const budgetMonthRepo: IBudgetMonthRepo = {
       }),
     )
     withCounts.sort(
-      (a, b) => b.count - a.count || a.m.createdAt.localeCompare(b.m.createdAt),
+      (a, b) => b.count - a.count || String(a.m.createdAt ?? '').localeCompare(String(b.m.createdAt ?? '')),
     )
     return withCounts[0].m
   },
