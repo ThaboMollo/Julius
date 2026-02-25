@@ -18,10 +18,10 @@ export const billTickRepo: IBillTickRepo = {
   ): Promise<BillTick | undefined> {
     const userId = activeUserId()
     const found = await db.billTicks
-      .where('[budgetMonthId+budgetItemId]')
-      .equals([budgetMonthId, budgetItemId])
+      .where('[userId+budgetMonthId+budgetItemId]')
+      .equals([userId, budgetMonthId, budgetItemId])
       .toArray()
-    return found.find((row) => row.userId === userId && row.deletedAt === null)
+    return found.find((row) => row.deletedAt === null)
   },
 
   async getById(id: string): Promise<BillTick | undefined> {
