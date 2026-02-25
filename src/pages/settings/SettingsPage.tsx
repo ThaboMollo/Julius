@@ -150,7 +150,8 @@ export function SettingsPage() {
       setSyncMessage('Sync complete.')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sync failed.'
-      setSyncMessage(message)
+      alert(`Sync failed:\n\n${message}`)
+      setSyncMessage('')
     } finally {
       setSyncing(false)
     }
