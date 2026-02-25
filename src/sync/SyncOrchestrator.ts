@@ -59,6 +59,7 @@ export class SyncOrchestrator {
     const syncState = await ensureSyncState(userId)
 
     await migrateLocalRowsToUser(userId)
+    await deduplicateLocalData(userId)
 
     const pullAt = nowIso()
     for (const table of TABLE_ORDER) {
@@ -144,6 +145,144 @@ async function migrateLocalRowsToUser(userId: string): Promise<void> {
     const { error } = await supabase.from(table.cloud).upsert(cloudPayload, { onConflict: 'id' })
     if (error) {
       throw new Error(`Silent upload failed for ${table.cloud}: ${error.message}`)
+    }
+  }
+}
+
+/**
+ * Removes ghost records created during a broken migration window.
+ *
+ * Two scenarios this cleans up:
+ * 1. Duplicate budget months for the same monthKey — the empty one is a ghost
+ *    created by getOrCreate when scope was wrong. Keep the one with the most
+ *    budget items; re-parent any stray items/transactions/billTicks to it.
+ * 2. Duplicate budget groups with the same name — seeded by seedDefaults()
+ *    when it ran against user.id scope before migration. Keep the oldest
+ *    (lowest createdAt). Re-parent categories and budget items to it.
+ */
+async function deduplicateLocalData(userId: string): Promise<void> {
+  const now = nowIso()
+
+  // ── Budget months ──────────────────────────────────────────────────────────
+  const allMonths = (await db.budgetMonths.toArray()).filter(
+    (m) => m.userId === userId && m.deletedAt === null,
+  )
+  const monthsByKey = new Map<string, typeof allMonths>()
+  for (const m of allMonths) {
+    const list = monthsByKey.get(m.monthKey) ?? []
+    list.push(m)
+    monthsByKey.set(m.monthKey, list)
+  }
+
+  for (const [, months] of monthsByKey) {
+    if (months.length <= 1) continue
+
+    // Count budget items per month to find the "real" one.
+    const withCounts = await Promise.all(
+      months.map(async (m) => {
+        const items = (await db.budgetItems.where('budgetMonthId').equals(m.id).toArray()).filter(
+          (i) => i.userId === userId && i.deletedAt === null,
+        )
+        return { month: m, itemCount: items.length }
+      }),
+    )
+
+    // Sort: most items first, then oldest createdAt as tiebreaker.
+    withCounts.sort(
+      (a, b) =>
+        b.itemCount - a.itemCount ||
+        a.month.createdAt.localeCompare(b.month.createdAt),
+    )
+
+    const keep = withCounts[0].month
+    const ghosts = withCounts.slice(1).map((x) => x.month)
+
+    for (const ghost of ghosts) {
+      // Re-parent any items/transactions/billTicks from ghost to the real month.
+      const ghostItems = (await db.budgetItems.where('budgetMonthId').equals(ghost.id).toArray()).filter(
+        (i) => i.userId === userId && i.deletedAt === null,
+      )
+      for (const item of ghostItems) {
+        await db.budgetItems.update(item.id, { budgetMonthId: keep.id, updatedAt: now })
+      }
+
+      const ghostTxs = (await db.transactions.where('budgetMonthId').equals(ghost.id).toArray()).filter(
+        (t) => t.userId === userId && t.deletedAt === null,
+      )
+      for (const tx of ghostTxs) {
+        await db.transactions.update(tx.id, { budgetMonthId: keep.id, updatedAt: now })
+      }
+
+      const ghostTicks = (await db.billTicks.where('budgetMonthId').equals(ghost.id).toArray()).filter(
+        (t) => t.userId === userId && t.deletedAt === null,
+      )
+      for (const tick of ghostTicks) {
+        await db.billTicks.update(tick.id, { budgetMonthId: keep.id, updatedAt: now })
+      }
+
+      await db.budgetMonths.update(ghost.id, { deletedAt: now, updatedAt: now })
+    }
+  }
+
+  // ── Budget groups ──────────────────────────────────────────────────────────
+  const allGroups = (await db.budgetGroups.toArray()).filter(
+    (g) => g.userId === userId && g.deletedAt === null,
+  )
+  const groupsByName = new Map<string, typeof allGroups>()
+  for (const g of allGroups) {
+    const list = groupsByName.get(g.name) ?? []
+    list.push(g)
+    groupsByName.set(g.name, list)
+  }
+
+  for (const [, groups] of groupsByName) {
+    if (groups.length <= 1) continue
+
+    // Keep oldest (original migrated data has the earliest createdAt).
+    groups.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const keep = groups[0]
+    const ghosts = groups.slice(1)
+
+    for (const ghost of ghosts) {
+      // Re-parent categories under ghost group to the kept group.
+      const ghostCats = (await db.categories.where('groupId').equals(ghost.id).toArray()).filter(
+        (c) => c.userId === userId && c.deletedAt === null,
+      )
+      for (const cat of ghostCats) {
+        // Check if an equivalent category already exists under the kept group.
+        const duplicate = (await db.categories.where('groupId').equals(keep.id).toArray()).find(
+          (c) => c.userId === userId && c.deletedAt === null && c.name === cat.name,
+        )
+        if (duplicate) {
+          // Re-parent any budget items/transactions pointing at the ghost category.
+          const catItems = (await db.budgetItems.where('categoryId').equals(cat.id).toArray()).filter(
+            (i) => i.userId === userId && i.deletedAt === null,
+          )
+          for (const item of catItems) {
+            await db.budgetItems.update(item.id, { categoryId: duplicate.id, updatedAt: now })
+          }
+          const catTxs = (await db.transactions.where('categoryId').equals(cat.id).toArray()).filter(
+            (t) => t.userId === userId && t.deletedAt === null,
+          )
+          for (const tx of catTxs) {
+            await db.transactions.update(tx.id, { categoryId: duplicate.id, updatedAt: now })
+          }
+          await db.categories.update(cat.id, { deletedAt: now, updatedAt: now })
+        } else {
+          // Move the category to the kept group instead of deleting it.
+          await db.categories.update(cat.id, { groupId: keep.id, updatedAt: now })
+        }
+      }
+
+      // Re-parent budget items pointing at the ghost group.
+      const ghostGroupItems = (await db.budgetItems.where('groupId').equals(ghost.id).toArray()).filter(
+        (i) => i.userId === userId && i.deletedAt === null,
+      )
+      for (const item of ghostGroupItems) {
+        await db.budgetItems.update(item.id, { groupId: keep.id, updatedAt: now })
+      }
+
+      await db.budgetGroups.update(ghost.id, { deletedAt: now, updatedAt: now })
     }
   }
 }

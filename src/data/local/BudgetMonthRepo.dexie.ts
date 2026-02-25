@@ -26,17 +26,28 @@ export const budgetMonthRepo: IBudgetMonthRepo = {
   async getOrCreate(year: number, month: number): Promise<BudgetMonth> {
     const monthKey = format(new Date(year, month - 1, 1), 'yyyy-MM')
 
-    const existing = await this.getByKey(monthKey)
-    if (existing) {
-      return existing
+    const all = (await this.getAll()).filter((m) => m.monthKey === monthKey)
+
+    if (all.length === 0) {
+      return this.create({ year, month, monthKey, expectedIncome: null })
     }
 
-    return this.create({
-      year,
-      month,
-      monthKey,
-      expectedIncome: null,
-    })
+    if (all.length === 1) return all[0]
+
+    // Multiple months for the same key exist (ghost from a broken migration
+    // window). Prefer the one with the most budget items, then oldest createdAt.
+    const withCounts = await Promise.all(
+      all.map(async (m) => {
+        const count = (await db.budgetItems.where('budgetMonthId').equals(m.id).toArray()).filter(
+          (i) => i.userId === m.userId && i.deletedAt === null,
+        ).length
+        return { m, count }
+      }),
+    )
+    withCounts.sort(
+      (a, b) => b.count - a.count || a.m.createdAt.localeCompare(b.m.createdAt),
+    )
+    return withCounts[0].m
   },
 
   async create(budgetMonth: CreateBudgetMonth): Promise<BudgetMonth> {
