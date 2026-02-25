@@ -132,7 +132,18 @@ async function migrateLocalRowsToUser(userId: string): Promise<void> {
 
     const updatedAt = nowIso()
     for (const row of localRows) {
-      await localTable.update(row.id, { userId, updatedAt })
+      // appSettings uses a compound primary key: 'app-settings:<userId>'.
+      // We must delete the old record and re-insert with the new id so that
+      // settingsRepo.get() can find it by the correct scoped key.
+      if (table.local === 'appSettings' && typeof row.id === 'string' && row.id.includes(':__local__')) {
+        const newId = row.id.replace(':__local__', `:${userId}`)
+        await localTable.delete(row.id)
+        await localTable.put({ ...row, id: newId, userId, updatedAt })
+        // Update the row reference so the cloud payload uses the new id.
+        row.id = newId
+      } else {
+        await localTable.update(row.id, { userId, updatedAt })
+      }
     }
     workItems.push({ table, rows: localRows as LocalSyncRow[], updatedAt })
   }

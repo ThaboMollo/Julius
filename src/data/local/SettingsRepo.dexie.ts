@@ -3,13 +3,14 @@ import type { ISettingsRepo } from '../repositories/SettingsRepo'
 import type { AppSettings } from '../../domain/models'
 import { DEFAULT_PAYDAY_DAY } from '../../domain/constants'
 import { activeUserId, stampNew, stampUpdate } from './scoped'
-import { nowIso } from '../../auth/userScope'
+import { LOCAL_USER_ID, nowIso } from '../../auth/userScope'
 
 const SETTINGS_ID = 'app-settings'
 
 export const settingsRepo: ISettingsRepo = {
   async get(): Promise<AppSettings> {
-    const scopedId = `${SETTINGS_ID}:${activeUserId()}`
+    const userId = activeUserId()
+    const scopedId = `${SETTINGS_ID}:${userId}`
     const existing = await db.appSettings.get(scopedId)
     if (existing && existing.deletedAt === null) {
       if (typeof existing.cloudModeEnabled === 'undefined') {
@@ -24,9 +25,9 @@ export const settingsRepo: ISettingsRepo = {
       return existing
     }
 
-    // Backward-compat: migrate legacy single-record settings row without scoped id.
+    // Backward-compat: legacy single-record row without scoped id.
     const legacy = await db.appSettings.get(SETTINGS_ID)
-    if (legacy && legacy.deletedAt === null && legacy.userId === activeUserId()) {
+    if (legacy && legacy.deletedAt === null && legacy.userId === userId) {
       const migrated: AppSettings = {
         ...legacy,
         id: scopedId,
@@ -35,6 +36,24 @@ export const settingsRepo: ISettingsRepo = {
       await db.appSettings.delete(SETTINGS_ID)
       await db.appSettings.put(migrated)
       return migrated
+    }
+
+    // Backward-compat: after userId migration the record still has
+    // id = 'app-settings:__local__' but userId was already updated to the
+    // authenticated user id. Rename the primary key to the user-scoped id.
+    if (userId !== LOCAL_USER_ID) {
+      const localScopedId = `${SETTINGS_ID}:${LOCAL_USER_ID}`
+      const fromLocal = await db.appSettings.get(localScopedId)
+      if (fromLocal && fromLocal.deletedAt === null && fromLocal.userId === userId) {
+        const migrated: AppSettings = {
+          ...fromLocal,
+          id: scopedId,
+          updatedAt: nowIso(),
+        }
+        await db.appSettings.delete(localScopedId)
+        await db.appSettings.put(migrated)
+        return migrated
+      }
     }
 
     const defaultSettings: AppSettings = {
