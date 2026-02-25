@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setActiveUserId(user.id)
       setDataVersion((v) => v + 1)
       setSyncStatus('error')
+      throw err // re-throw so manual callers can display the message
     }
   }, [offlineMode, user])
 
