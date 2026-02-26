@@ -1,0 +1,694 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { budgetGroupRepo, categoryRepo, templateRepo } from '../../data/local'
+import type {
+  BudgetGroup,
+  Category,
+  RecurringTemplate,
+  CreateBudgetGroup,
+  CreateCategory,
+  CreateRecurringTemplate,
+} from '../../domain/models'
+import { formatCurrency } from '../../domain/constants'
+
+export function ConfigurationsPage() {
+  const [loading, setLoading] = useState(true)
+  const [groups, setGroups] = useState<BudgetGroup[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [templates, setTemplates] = useState<RecurringTemplate[]>([])
+
+  const [showGroupModal, setShowGroupModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [editingGroup, setEditingGroup] = useState<BudgetGroup | null>(null)
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+  const [editingTemplate, setEditingTemplate] = useState<RecurringTemplate | null>(null)
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    setLoading(true)
+    try {
+      const [grps, cats, tmpls] = await Promise.all([
+        budgetGroupRepo.getAll(),
+        categoryRepo.getAll(),
+        templateRepo.getAll(),
+      ])
+      setGroups(grps.sort((a, b) => a.sortOrder - b.sortOrder))
+      setCategories(cats)
+      setTemplates(tmpls)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDeleteGroup(id: string) {
+    const hasRefs = await budgetGroupRepo.hasReferences(id)
+    if (hasRefs) {
+      alert('Cannot delete this group - it has categories or budget items. Deactivate it instead.')
+      return
+    }
+    if (confirm('Delete this group?')) {
+      await budgetGroupRepo.delete(id)
+      await loadData()
+    }
+  }
+
+  async function handleToggleGroupActive(group: BudgetGroup) {
+    await budgetGroupRepo.update(group.id, { isActive: !group.isActive })
+    await loadData()
+  }
+
+  async function handleDeleteCategory(id: string) {
+    const hasRefs = await categoryRepo.hasReferences(id)
+    if (hasRefs) {
+      alert('Cannot delete this category - it has budget items or transactions. Deactivate it instead.')
+      return
+    }
+    if (confirm('Delete this category?')) {
+      await categoryRepo.delete(id)
+      await loadData()
+    }
+  }
+
+  async function handleToggleCategoryActive(cat: Category) {
+    await categoryRepo.update(cat.id, { isActive: !cat.isActive })
+    await loadData()
+  }
+
+  async function handleDeleteTemplate(id: string) {
+    if (confirm('Delete this template?')) {
+      await templateRepo.delete(id)
+      await loadData()
+    }
+  }
+
+  async function handleToggleTemplateActive(tmpl: RecurringTemplate) {
+    await templateRepo.update(tmpl.id, { isActive: !tmpl.isActive })
+    await loadData()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-6 pb-24">
+      <div className="flex items-center gap-3">
+        <Link
+          to="/settings"
+          className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
+        >
+          ← Settings
+        </Link>
+        <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Configurations</h1>
+      </div>
+
+      {/* Budget Groups */}
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Budget Groups</h2>
+          <button
+            onClick={() => {
+              setEditingGroup(null)
+              setShowGroupModal(true)
+            }}
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
+          >
+            + Add
+          </button>
+        </div>
+        <div className="divide-y dark:divide-[#2E3A4E]">
+          {groups.map((group) => (
+            <div key={group.id} className={`p-4 flex items-center justify-between ${!group.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
+              <div>
+                <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{group.name}</span>
+                {group.isDefault && (
+                  <span className="ml-2 text-xs bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
+                    Default
+                  </span>
+                )}
+                {!group.isActive && (
+                  <span className="ml-2 text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
+                    Inactive
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleToggleGroupActive(group)}
+                  className="text-sm text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
+                >
+                  {group.isActive ? 'Deactivate' : 'Activate'}
+                </button>
+                <button
+                  onClick={() => {
+                    setEditingGroup(group)
+                    setShowGroupModal(true)
+                  }}
+                  className="text-sm text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
+                >
+                  Edit
+                </button>
+                {!group.isDefault && (
+                  <button
+                    onClick={() => handleDeleteGroup(group.id)}
+                    className="text-sm text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Categories */}
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Categories</h2>
+          <button
+            onClick={() => {
+              setEditingCategory(null)
+              setShowCategoryModal(true)
+            }}
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
+          >
+            + Add
+          </button>
+        </div>
+        <div className="divide-y dark:divide-[#2E3A4E]">
+          {categories.map((cat) => {
+            const group = groups.find((g) => g.id === cat.groupId)
+            return (
+              <div key={cat.id} className={`p-4 flex items-center justify-between ${!cat.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
+                <div>
+                  <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{cat.name}</span>
+                  <span className="ml-2 text-xs text-gray-500 dark:text-[#8A9BAA]">{group?.name}</span>
+                  {!cat.isActive && (
+                    <span className="ml-2 text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
+                      Inactive
+                    </span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleToggleCategoryActive(cat)}
+                    className="text-sm text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
+                  >
+                    {cat.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCategory(cat)
+                      setShowCategoryModal(true)
+                    }}
+                    className="text-sm text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
+                  >
+                    Edit
+                  </button>
+                  {!cat.isDefault && (
+                    <button
+                      onClick={() => handleDeleteCategory(cat.id)}
+                      className="text-sm text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Recurring Templates */}
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Recurring Templates</h2>
+          <button
+            onClick={() => {
+              setEditingTemplate(null)
+              setShowTemplateModal(true)
+            }}
+            className="text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550] text-sm font-medium"
+          >
+            + Add
+          </button>
+        </div>
+        {templates.length === 0 ? (
+          <div className="p-4 text-center text-gray-500 dark:text-[#8A9BAA] text-sm">
+            No recurring templates. Add templates to auto-populate each month's budget.
+          </div>
+        ) : (
+          <div className="divide-y dark:divide-[#2E3A4E]">
+            {templates.map((tmpl) => {
+              const group = groups.find((g) => g.id === tmpl.groupId)
+              const category = categories.find((c) => c.id === tmpl.categoryId)
+              const effective = tmpl.plannedAmount * tmpl.multiplier * tmpl.splitRatio
+
+              return (
+                <div key={tmpl.id} className={`p-4 ${!tmpl.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{tmpl.name}</span>
+                        {tmpl.isBill && (
+                          <span className="text-xs bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B] px-1.5 py-0.5 rounded">
+                            Bill
+                          </span>
+                        )}
+                        {!tmpl.isActive && (
+                          <span className="text-xs bg-gray-200 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] px-1.5 py-0.5 rounded">
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
+                        {group?.name} · {category?.name}
+                        {tmpl.multiplier !== 1 && ` × ${tmpl.multiplier}`}
+                        {tmpl.splitRatio !== 1 && ` × ${tmpl.splitRatio}`}
+                        {tmpl.isBill && tmpl.dueDayOfMonth && ` · Due: ${tmpl.dueDayOfMonth}th`}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(effective)}</div>
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={() => handleToggleTemplateActive(tmpl)}
+                          className="text-xs text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4]"
+                        >
+                          {tmpl.isActive ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingTemplate(tmpl)
+                            setShowTemplateModal(true)
+                          }}
+                          className="text-xs text-[#A89060] dark:text-[#C4A86B] hover:text-[#8B7550]"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTemplate(tmpl.id)}
+                          className="text-xs text-red-600 hover:text-red-800"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modals */}
+      {showGroupModal && (
+        <GroupModal
+          isOpen={showGroupModal}
+          onClose={() => setShowGroupModal(false)}
+          group={editingGroup}
+          onSave={async (data) => {
+            if (editingGroup) {
+              await budgetGroupRepo.update(editingGroup.id, data)
+            } else {
+              await budgetGroupRepo.create(data)
+            }
+            setShowGroupModal(false)
+            await loadData()
+          }}
+          existingGroups={groups}
+        />
+      )}
+
+      {showCategoryModal && (
+        <CategoryModal
+          isOpen={showCategoryModal}
+          onClose={() => setShowCategoryModal(false)}
+          category={editingCategory}
+          groups={groups.filter((g) => g.isActive)}
+          onSave={async (data) => {
+            if (editingCategory) {
+              await categoryRepo.update(editingCategory.id, data)
+            } else {
+              await categoryRepo.create(data)
+            }
+            setShowCategoryModal(false)
+            await loadData()
+          }}
+        />
+      )}
+
+      {showTemplateModal && (
+        <TemplateModal
+          isOpen={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          template={editingTemplate}
+          groups={groups.filter((g) => g.isActive)}
+          categories={categories.filter((c) => c.isActive)}
+          onSave={async (data) => {
+            if (editingTemplate) {
+              await templateRepo.update(editingTemplate.id, data)
+            } else {
+              await templateRepo.create(data)
+            }
+            setShowTemplateModal(false)
+            await loadData()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Group Modal
+function GroupModal({
+  isOpen,
+  onClose,
+  group,
+  onSave,
+  existingGroups,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  group: BudgetGroup | null
+  onSave: (data: CreateBudgetGroup) => void
+  existingGroups: BudgetGroup[]
+}) {
+  const [name, setName] = useState(group?.name || '')
+  const [sortOrder, setSortOrder] = useState(
+    group?.sortOrder?.toString() || (existingGroups.length + 1).toString()
+  )
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-[#252D3D] w-full max-w-sm rounded-xl">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">{group ? 'Edit Group' : 'Add Group'}</h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">×</button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!name.trim()) return
+            onSave({
+              name: name.trim(),
+              sortOrder: parseInt(sortOrder, 10) || 1,
+              isDefault: group?.isDefault || false,
+              isActive: true,
+            })
+          }}
+          className="p-4 space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Sort Order</label>
+            <input
+              type="number"
+              min="1"
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg">Cancel</button>
+            <button type="submit" className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Category Modal
+function CategoryModal({
+  isOpen,
+  onClose,
+  category,
+  groups,
+  onSave,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  category: Category | null
+  groups: BudgetGroup[]
+  onSave: (data: CreateCategory) => void
+}) {
+  const [name, setName] = useState(category?.name || '')
+  const [groupId, setGroupId] = useState(category?.groupId || groups[0]?.id || '')
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-[#252D3D] w-full max-w-sm rounded-xl">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">{category ? 'Edit Category' : 'Add Category'}</h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">×</button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!name.trim() || !groupId) return
+            onSave({
+              name: name.trim(),
+              groupId,
+              isDefault: category?.isDefault || false,
+              isActive: true,
+            })
+          }}
+          className="p-4 space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg">Cancel</button>
+            <button type="submit" className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// Template Modal
+function TemplateModal({
+  isOpen,
+  onClose,
+  template,
+  groups,
+  categories,
+  onSave,
+}: {
+  isOpen: boolean
+  onClose: () => void
+  template: RecurringTemplate | null
+  groups: BudgetGroup[]
+  categories: Category[]
+  onSave: (data: CreateRecurringTemplate) => void
+}) {
+  const [groupId, setGroupId] = useState(template?.groupId || groups[0]?.id || '')
+  const [categoryId, setCategoryId] = useState(template?.categoryId || '')
+  const [name, setName] = useState(template?.name || '')
+  const [plannedAmount, setPlannedAmount] = useState(template?.plannedAmount?.toString() || '')
+  const [multiplier, setMultiplier] = useState(template?.multiplier?.toString() || '1')
+  const [splitRatio, setSplitRatio] = useState(template?.splitRatio?.toString() || '1')
+  const [isBill, setIsBill] = useState(template?.isBill || false)
+  const [dueDayOfMonth, setDueDayOfMonth] = useState(template?.dueDayOfMonth?.toString() || '')
+
+  const filteredCategories = categories.filter((c) => c.groupId === groupId)
+
+  useEffect(() => {
+    if (filteredCategories.length > 0 && !filteredCategories.find((c) => c.id === categoryId)) {
+      setCategoryId(filteredCategories[0].id)
+    }
+  }, [groupId, filteredCategories])
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
+        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">
+            {template ? 'Edit Template' : 'Add Template'}
+          </h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">×</button>
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const amount = parseFloat(plannedAmount)
+            if (isNaN(amount) || amount < 0) {
+              alert('Please enter a valid amount')
+              return
+            }
+            if (!groupId || !categoryId || !name.trim()) {
+              alert('Please fill all required fields')
+              return
+            }
+            onSave({
+              groupId,
+              categoryId,
+              name: name.trim(),
+              plannedAmount: amount,
+              multiplier: parseFloat(multiplier) || 1,
+              splitRatio: parseFloat(splitRatio) || 1,
+              isBill,
+              dueDayOfMonth: isBill && dueDayOfMonth ? parseInt(dueDayOfMonth, 10) : null,
+              isActive: true,
+            })
+          }}
+          className="p-4 space-y-4"
+        >
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Category</label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            >
+              {filteredCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Planned Amount (ZAR)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={plannedAmount}
+              onChange={(e) => setPlannedAmount(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Multiplier</label>
+              <input
+                type="number"
+                step="1"
+                min="1"
+                value={multiplier}
+                onChange={(e) => setMultiplier(e.target.value)}
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Split Ratio</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="1"
+                value={splitRatio}
+                onChange={(e) => setSplitRatio(e.target.value)}
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This is a bill</label>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Set a monthly due day</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsBill(!isBill)}
+              className={`relative w-12 h-6 rounded-full transition-colors ${isBill ? 'bg-[#A89060]' : 'bg-gray-300 dark:bg-[#2E3A4E]'}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${isBill ? 'translate-x-6' : ''}`} />
+            </button>
+          </div>
+          {isBill && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Due Day of Month</label>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                value={dueDayOfMonth}
+                onChange={(e) => setDueDayOfMonth(e.target.value)}
+                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              />
+            </div>
+          )}
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg">Cancel</button>
+            <button type="submit" className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

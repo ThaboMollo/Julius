@@ -7,6 +7,7 @@ import { BillsPage } from './pages/bills/BillsPage'
 import { TimelinePage } from './pages/timeline/TimelinePage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
+import { ConfigurationsPage } from './pages/settings/ConfigurationsPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
@@ -47,6 +48,7 @@ function App() {
           <Route path="analytics" element={<AnalyticsPage />} />
           <Route path="planner" element={<PlannerPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="configurations" element={<ConfigurationsPage />} />
         </Route>
       </Routes>
     </MonthProvider>
