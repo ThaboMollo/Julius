@@ -15,13 +15,14 @@ import { PlannerPage } from './pages/planner/PlannerPage'
 import { MonthProvider } from './app/MonthContext'
 import { SplashScreen } from './app/SplashScreen'
 import { seedDefaults } from './data/local/seed'
+import { migratePaidBillsToTransactions } from './data/local/migrations'
 
 function App() {
   const [dbReady, setDbReady] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
-    seedDefaults().then(() => setDbReady(true))
+    Promise.all([seedDefaults(), migratePaidBillsToTransactions()]).then(() => setDbReady(true))
   }, [])
 
   const handleSplashDone = useCallback(() => setSplashDone(true), [])

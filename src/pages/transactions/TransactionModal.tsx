@@ -13,6 +13,7 @@ interface Props {
   onSave: (data: CreateTransaction) => void
   onDelete?: () => void
   transaction: Transaction | null
+  initialValues?: Partial<CreateTransaction>
   categories: Category[]
   items: BudgetItem[]
   budgetMonthId: string
@@ -24,19 +25,21 @@ export function TransactionModal({
   onSave,
   onDelete,
   transaction,
+  initialValues,
   categories,
   items,
   budgetMonthId,
 }: Props) {
-  const [amount, setAmount] = useState(transaction?.amount?.toString() || '')
+  const seed = transaction ?? initialValues
+  const [amount, setAmount] = useState(seed?.amount?.toString() ?? '')
   const [date, setDate] = useState(
-    transaction?.date
-      ? format(new Date(transaction.date), 'yyyy-MM-dd')
+    seed?.date
+      ? format(new Date(seed.date), 'yyyy-MM-dd')
       : format(new Date(), 'yyyy-MM-dd')
   )
-  const [categoryId, setCategoryId] = useState(transaction?.categoryId || '')
-  const [budgetItemId, setBudgetItemId] = useState(transaction?.budgetItemId || '')
-  const [note, setNote] = useState(transaction?.note || '')
+  const [categoryId, setCategoryId] = useState(seed?.categoryId ?? '')
+  const [budgetItemId, setBudgetItemId] = useState(seed?.budgetItemId ?? '')
+  const [note, setNote] = useState(seed?.note ?? '')
 
   useEffect(() => {
     if (transaction) {

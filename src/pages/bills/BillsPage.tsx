@@ -8,6 +8,7 @@ import {
   budgetGroupRepo,
   categoryRepo,
   settingsRepo,
+  transactionRepo,
 } from '../../data/local'
 import type {
   BudgetMonth,
@@ -16,9 +17,11 @@ import type {
   BudgetGroup,
   Category,
   AppSettings,
+  CreateTransaction,
 } from '../../domain/models'
 import { effectivePlanned, getBillDueStatus, type BillDueStatus } from '../../domain/rules'
 import { formatCurrency } from '../../domain/constants'
+import { TransactionModal } from '../transactions/TransactionModal'
 
 type FilterType = 'all' | 'overdue' | 'due_today' | 'due_tomorrow' | 'due_before_payday' | 'unpaid' | 'paid'
 
@@ -44,6 +47,8 @@ export function BillsPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
+  const [billModalOpen, setBillModalOpen] = useState(false)
+  const [pendingPayBill, setPendingPayBill] = useState<BudgetItem | null>(null)
 
   useEffect(() => {
     loadData()
@@ -79,11 +84,31 @@ export function BillsPage() {
     }
   }
 
-  async function togglePaid(itemId: string) {
+  async function togglePaid(bill: BudgetItem) {
     if (!budgetMonth) return
-    await billTickRepo.togglePaid(budgetMonth.id, itemId)
-    const ticks = await billTickRepo.getByMonth(budgetMonth.id)
-    setBillTicks(ticks)
+    const currentTick = billTicks.find((t) => t.budgetItemId === bill.id)
+    if (currentTick?.isPaid) {
+      const linked = await transactionRepo.getByItem(bill.id)
+      const txForMonth = linked.find((tx) => tx.budgetMonthId === budgetMonth.id)
+      if (txForMonth) {
+        const deleteIt = window.confirm(`Also delete the transaction for "${bill.name}"?`)
+        if (deleteIt) await transactionRepo.delete(txForMonth.id)
+      }
+      await billTickRepo.togglePaid(budgetMonth.id, bill.id)
+      setBillTicks(await billTickRepo.getByMonth(budgetMonth.id))
+    } else {
+      setPendingPayBill(bill)
+      setBillModalOpen(true)
+    }
+  }
+
+  async function handleBillTransactionSave(data: CreateTransaction) {
+    if (!pendingPayBill || !budgetMonth) return
+    await transactionRepo.create(data)
+    await billTickRepo.togglePaid(budgetMonth.id, pendingPayBill.id)
+    setBillTicks(await billTickRepo.getByMonth(budgetMonth.id))
+    setBillModalOpen(false)
+    setPendingPayBill(null)
   }
 
   function getBillStatus(item: BudgetItem): BillDueStatus {
@@ -137,6 +162,16 @@ export function BillsPage() {
   }
 
   const filteredBills = getFilteredBills()
+  const billInitialValues: Partial<CreateTransaction> | undefined = pendingPayBill
+    ? {
+        budgetMonthId: budgetMonth?.id ?? '',
+        categoryId: pendingPayBill.categoryId,
+        budgetItemId: pendingPayBill.id,
+        amount: effectivePlanned(pendingPayBill),
+        date: pendingPayBill.dueDate ?? new Date(),
+        note: pendingPayBill.name,
+      }
+    : undefined
   const unpaidTotal = bills
     .filter((b) => !billTicks.find((t) => t.budgetItemId === b.id)?.isPaid)
     .reduce((sum, b) => sum + effectivePlanned(b), 0)
@@ -225,7 +260,7 @@ export function BillsPage() {
               >
                 {/* Checkbox */}
                 <button
-                  onClick={() => togglePaid(bill.id)}
+                  onClick={() => togglePaid(bill)}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                     isPaid
                       ? 'bg-green-500 border-green-500 text-white'
@@ -268,6 +303,17 @@ export function BillsPage() {
           })}
         </div>
       )}
+      <TransactionModal
+        key={pendingPayBill?.id}
+        isOpen={billModalOpen}
+        onClose={() => { setBillModalOpen(false); setPendingPayBill(null) }}
+        onSave={handleBillTransactionSave}
+        transaction={null}
+        initialValues={billInitialValues}
+        categories={categories}
+        items={bills}
+        budgetMonthId={budgetMonth?.id ?? ''}
+      />
     </div>
   )
 }
