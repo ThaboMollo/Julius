@@ -22,6 +22,23 @@ import { migratePaidBillsToTransactions } from './data/local/migrations'
 function App() {
   const [dbReady, setDbReady] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
+  const [globalError, setGlobalError] = useState('')
+
+  useEffect(() => {
+    const handler = (e: ErrorEvent) => {
+      setGlobalError(`${e.message}\n${e.filename}:${e.lineno}:${e.colno}`)
+    }
+    const rejectionHandler = (e: PromiseRejectionEvent) => {
+      const msg = e.reason instanceof Error ? `${e.reason.message}\n${e.reason.stack?.split('\n').slice(0, 3).join('\n')}` : String(e.reason)
+      setGlobalError(msg)
+    }
+    window.addEventListener('error', handler)
+    window.addEventListener('unhandledrejection', rejectionHandler)
+    return () => {
+      window.removeEventListener('error', handler)
+      window.removeEventListener('unhandledrejection', rejectionHandler)
+    }
+  }, [])
 
   useEffect(() => {
     Promise.all([seedDefaults(), migratePaidBillsToTransactions()]).then(() => setDbReady(true))
@@ -35,6 +52,12 @@ function App() {
 
   return (
     <MonthProvider>
+      {globalError && (
+        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#fee', padding: '12px', fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto', borderTop: '2px solid red' }}>
+          <strong>Error:</strong> {globalError}
+          <button onClick={() => setGlobalError('')} style={{ float: 'right', padding: '4px 8px' }}>Dismiss</button>
+        </div>
+      )}
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
