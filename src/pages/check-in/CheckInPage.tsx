@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { format, subMonths, startOfMonth } from 'date-fns'
 import { useMonth } from '../../app/MonthContext'
-import { getParserForBank } from '../../data/parsers'
+import { parseStatement, PdfPasswordRequired, PdfScannedImage } from '../../data/parsers'
 import { getOpenAIKey, analyzeCheckIn } from '../../ai/openai'
 import {
   budgetMonthRepo,
@@ -36,7 +36,6 @@ import { SuggestedBudgetSection } from './SuggestedBudgetSection'
 import { PlannerReviewSection } from './PlannerReviewSection'
 import { TransactionModal } from '../transactions/TransactionModal'
 import { BudgetItemModal } from '../budget/BudgetItemModal'
-import type { ParsedTransaction } from '../../data/parsers/types'
 
 const LOADING_MESSAGES = [
   'Checking your damage...',
@@ -64,6 +63,8 @@ export function CheckInPage() {
   const [banks, setBanks] = useState<BankConfig[]>([])
   const [selectedBankId, setSelectedBankId] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const [pdfPassword, setPdfPassword] = useState('')
+  const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{ bank: BankConfig; files: File[] } | null>(null)
 
   // Loading animation
   const [loadingMsg, setLoadingMsg] = useState(LOADING_MESSAGES[0])
@@ -153,8 +154,8 @@ export function CheckInPage() {
   }
 
   async function handleUpload() {
-    const file = fileRef.current?.files?.[0]
-    if (!file) { setError('Please select a CSV file.'); return }
+    const files = fileRef.current?.files
+    if (!files || files.length === 0) { setError('Please select a bank statement file.'); return }
 
     const bank = banks.find((b) => b.id === selectedBankId)
     if (!bank) { setError('Please select a bank.'); return }
@@ -166,17 +167,34 @@ export function CheckInPage() {
     setPageState('loading')
 
     try {
-      // 1. Parse CSV
-      const csvText = await file.text()
-      let parsed: ParsedTransaction[]
+      // 1. Parse files
+      let result
       try {
-        const parser = getParserForBank(bank.bankCode)
-        parsed = parser(csvText)
-      } catch {
-        setError(`Failed to parse CSV. Make sure you selected the correct bank (${bank.bankName}).`)
+        result = await parseStatement(bank, Array.from(files), pdfPassword || undefined)
+      } catch (err) {
+        if (err instanceof PdfPasswordRequired) {
+          setPdfPasswordPrompt({ bank, files: Array.from(files) })
+          setPageState('upload')
+          return
+        }
+        if (err instanceof PdfScannedImage) {
+          setError((err as Error).message)
+          setPageState('upload')
+          return
+        }
+        setError(`Failed to parse files. Make sure you selected the correct bank (${bank.bankName}).`)
         setPageState('upload')
         return
       }
+
+      // Check-in aborts on any failure (AI needs complete data)
+      if (result.errors.length > 0) {
+        setError(result.errors.map((e) => e.message).join('\n'))
+        setPageState('upload')
+        return
+      }
+
+      const parsed = result.transactions
 
       if (parsed.length === 0) {
         setError('No transactions found in this file.')
@@ -421,11 +439,12 @@ export function CheckInPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Bank Statement (CSV)</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Bank Statement (CSV or PDF)</label>
               <input
                 ref={fileRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.pdf"
+                multiple
                 className="w-full text-sm text-gray-500 dark:text-[#8A9BAA] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#A89060] file:text-white hover:file:bg-[#8B7550]"
               />
             </div>
@@ -443,6 +462,41 @@ export function CheckInPage() {
         {error && (
           <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4">
             <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+          </div>
+        )}
+
+        {pdfPasswordPrompt && (
+          <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4 space-y-3">
+            <h3 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">Password Required</h3>
+            <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+              This PDF is password-protected. For FNB, this is usually your ID number.
+            </p>
+            <input
+              type="password"
+              value={pdfPassword}
+              onChange={(e) => setPdfPassword(e.target.value)}
+              placeholder="Enter PDF password"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPdfPasswordPrompt(null)
+                  void handleUpload()
+                }}
+                className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
+              >
+                Unlock & Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPdfPasswordPrompt(null); setPdfPassword('') }}
+                className="flex-1 py-2 bg-gray-200 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
       </div>
