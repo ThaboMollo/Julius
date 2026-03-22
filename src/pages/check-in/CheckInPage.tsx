@@ -28,7 +28,7 @@ import type {
   BudgetGroup,
 } from '../../domain/models'
 import { totalPlanned, totalActual, calculateAffordability, effectivePlanned } from '../../domain/rules'
-import { formatCurrency, UNCATEGORISED_CATEGORY } from '../../domain/constants'
+import { UNCATEGORISED_CATEGORY } from '../../domain/constants'
 import { VerdictCard } from './VerdictCard'
 import { KPISummaryStrip } from './KPISummaryStrip'
 import { OutsideBudgetSection } from './OutsideBudgetSection'
@@ -37,9 +37,6 @@ import { PlannerReviewSection } from './PlannerReviewSection'
 import { TransactionModal } from '../transactions/TransactionModal'
 import { BudgetItemModal } from '../budget/BudgetItemModal'
 import type { ParsedTransaction } from '../../data/parsers/types'
-
-// Suppress unused import warning — formatCurrency is available for future use
-void formatCurrency
 
 const LOADING_MESSAGES = [
   'Checking your damage...',
@@ -126,6 +123,19 @@ export function CheckInPage() {
       setResult(existing)
       setPageState('results')
       await loadModalData()
+
+      // Restore KPI data for revisiting a completed check-in
+      const settings = await settingsRepo.get()
+      setPaydayDay(settings.paydayDayOfMonth)
+      const bm = await budgetMonthRepo.getOrCreate(year, month)
+      const [ticks, items] = await Promise.all([
+        billTickRepo.getByMonth(bm.id),
+        budgetItemRepo.getByMonth(bm.id),
+      ])
+      setBillTicks(ticks)
+      // Reconstruct bank debit total from stored spending progress %
+      const planned = totalPlanned(items)
+      setBankDebitTotal(planned > 0 ? (existing.spendingProgressPercent / 100) * planned : 0)
     }
   }
 
