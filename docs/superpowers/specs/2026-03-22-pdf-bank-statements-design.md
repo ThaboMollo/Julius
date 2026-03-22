@@ -200,3 +200,16 @@ async function parseStatement(
 | `src/pages/settings/BankAccountsSection.tsx` | Multi-file upload, accept PDF, use `parseStatement()` |
 | `src/pages/check-in/CheckInPage.tsx` | Multi-file upload, accept PDF, use `parseStatement()` |
 | `package.json` | Add `pdfjs-dist` dependency |
+
+---
+
+## 8. Testing
+
+The project currently has no test infrastructure. Manual testing approach:
+
+- **Per-bank PDF parsers:** Test with real PDF statements from each bank (user to provide sample files)
+- **Helpers refactor:** Verify existing CSV parsing still works after refactoring to shared helpers (upload a known CSV, confirm same results)
+- **Deduplication:** Upload overlapping CSV + PDF from the same period, confirm duplicates are removed
+- **Password PDF:** Test with a password-protected FNB statement
+- **Scanned PDF:** Test with an image-based PDF to confirm the error message appears
+- **Multi-file:** Upload 2-3 files at once, confirm all transactions are merged
