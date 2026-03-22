@@ -63,6 +63,7 @@ export function CheckInPage() {
   const [banks, setBanks] = useState<BankConfig[]>([])
   const [selectedBankId, setSelectedBankId] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const [hasFiles, setHasFiles] = useState(false)
   const [pdfPassword, setPdfPassword] = useState('')
   const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{ bank: BankConfig; files: File[] } | null>(null)
 
@@ -445,14 +446,16 @@ export function CheckInPage() {
                 type="file"
                 accept=".csv,.pdf"
                 multiple
+                onChange={(e) => setHasFiles((e.target.files?.length ?? 0) > 0)}
                 className="w-full text-sm text-gray-500 dark:text-[#8A9BAA] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[#A89060] file:text-white hover:file:bg-[#8B7550]"
               />
             </div>
 
             <button
               type="button"
+              disabled={!hasFiles}
               onClick={() => void handleUpload()}
-              className="w-full py-3 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] font-medium"
+              className="w-full py-3 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] font-medium disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Run Check-In
             </button>
