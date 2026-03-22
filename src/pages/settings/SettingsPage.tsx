@@ -266,11 +266,16 @@ export function SettingsPage() {
             </label>
             <div className="flex gap-2">
               <input
-                type={apiKeyMasked ? 'password' : 'text'}
+                type="text"
                 value={apiKey}
                 onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('none') }}
                 placeholder="sk-..."
-                className="flex-1 px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                className={`flex-1 px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm ${apiKeyMasked ? '[-webkit-text-security:disc] [text-security:disc]' : ''}`}
+                style={apiKeyMasked ? { WebkitTextSecurity: 'disc' } as React.CSSProperties : undefined}
               />
               <button
                 type="button"
