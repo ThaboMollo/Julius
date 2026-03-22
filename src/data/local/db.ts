@@ -14,6 +14,7 @@ import type {
   StatementUpload,
   MigrationJournalEntry,
   SyncStateLocal,
+  CheckInResult,
 } from '../../domain/models'
 
 export class JuliusDB extends Dexie {
@@ -31,6 +32,7 @@ export class JuliusDB extends Dexie {
   statementUploads!: Table<StatementUpload, string>
   migrationJournal!: Table<MigrationJournalEntry, string>
   syncStateLocal!: Table<SyncStateLocal, string>
+  checkInResults!: Table<CheckInResult, string>
 
   constructor() {
     super('JuliusDB')
@@ -103,6 +105,24 @@ export class JuliusDB extends Dexie {
       .upgrade(async (tx) => {
         await stampAllTables(tx)
       })
+
+    this.version(5).stores({
+      budgetGroups: 'id, userId, name, sortOrder, isActive, [userId+isActive]',
+      categories: 'id, userId, name, groupId, isActive, [userId+groupId]',
+      budgetMonths: 'id, userId, monthKey, year, month, [userId+monthKey], [userId+year+month]',
+      budgetItems: 'id, userId, budgetMonthId, groupId, categoryId, isBill, templateId, [userId+budgetMonthId+groupId], [userId+budgetMonthId+categoryId]',
+      transactions: 'id, userId, budgetMonthId, categoryId, budgetItemId, date, [userId+budgetMonthId+date]',
+      billTicks: 'id, userId, budgetMonthId, budgetItemId, [userId+budgetMonthId+budgetItemId]',
+      recurringTemplates: 'id, userId, groupId, categoryId, isActive, isBill, [userId+groupId]',
+      appSettings: 'id, userId',
+      purchaseScenarios: 'id, userId',
+      scenarioExpenses: 'id, userId, scenarioId',
+      bankConfigs: 'id, userId, bankCode',
+      statementUploads: 'id, userId, bankConfigId',
+      migrationJournal: 'id, userId, status',
+      syncStateLocal: 'id, userId, lastSyncAt',
+      checkInResults: 'id, userId, monthKey, budgetMonthId, [userId+monthKey]',
+    })
   }
 }
 
