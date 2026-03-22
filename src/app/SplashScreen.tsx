@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import logo from '/logo.png'
 
+const APP_VERSION = __APP_VERSION__
+
 interface SplashScreenProps {
   onDone: () => void
 }
@@ -38,6 +40,9 @@ export function SplashScreen({ onDone }: SplashScreenProps) {
       </h1>
       <p className="text-sm mt-2" style={{ color: '#A8B8A0' }}>
         Personal Budget Tracker
+      </p>
+      <p className="text-xs mt-4" style={{ color: '#6B7A63' }}>
+        v{APP_VERSION}
       </p>
     </div>
   )
