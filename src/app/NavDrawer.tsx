@@ -23,14 +23,17 @@ export function NavDrawer({ isOpen, onClose }: NavDrawerProps) {
   const [checkInDone, setCheckInDone] = useState(false)
 
   useEffect(() => {
-    const day = new Date().getDate()
-    setShowCheckIn(day >= 13 && day <= 17)
+    const now = new Date()
+    const day = now.getDate()
+    const isWindow = day >= 13 && day <= 17
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 
-    if (day >= 13 && day <= 17) {
-      const now = new Date()
-      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-      checkInResultRepo.getByMonthKey(monthKey).then((r) => setCheckInDone(!!r))
-    }
+    checkInResultRepo.getByMonthKey(monthKey).then((r) => {
+      const done = !!r
+      setCheckInDone(done)
+      // Show if in the window OR if they haven't done a check-in this month yet
+      setShowCheckIn(isWindow || !done)
+    })
   }, [])
 
   return (
