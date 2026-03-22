@@ -310,7 +310,7 @@ export function CheckInPage() {
       setPaydayDay(settings.paydayDayOfMonth)
       setPageState('results')
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Something went wrong.'
+      const msg = err instanceof Error ? `${err.message}\n\n${err.stack?.split('\n').slice(0, 3).join('\n') ?? ''}` : String(err)
       setError(msg)
       setPageState('upload')
     }

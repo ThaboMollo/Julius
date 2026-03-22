@@ -63,6 +63,10 @@ export async function parseStatement(
   const allTransactions: ParsedTransaction[] = []
   const errors: { filename: string; message: string }[] = []
 
+  if (!files || !Array.isArray(files) || files.length === 0) {
+    return { transactions: [], errors: [{ filename: '(none)', message: 'No files provided.' }] }
+  }
+
   for (const file of files) {
     try {
       const format = detectFormat(file.name)
