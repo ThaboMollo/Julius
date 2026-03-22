@@ -16,6 +16,9 @@ import {
   totalPlannedByCategory,
 } from '../../domain/rules'
 import { formatCurrency } from '../../domain/constants'
+import { checkInResultRepo } from '../../data/local'
+import type { CheckInResult } from '../../domain/models'
+import { CheckInHistoryView } from '../check-in/CheckInHistoryView'
 
 interface MonthData {
   budgetMonth: BudgetMonth
@@ -36,6 +39,8 @@ export function AnalyticsPage() {
   const [groups, setGroups] = useState<BudgetGroup[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [drillDown, setDrillDown] = useState<DrillDownState | null>(null)
+  const [checkInHistory, setCheckInHistory] = useState<CheckInResult[]>([])
+  const [viewingCheckIn, setViewingCheckIn] = useState<CheckInResult | null>(null)
 
   useEffect(() => {
     loadData()
@@ -76,6 +81,9 @@ export function AnalyticsPage() {
       }
 
       setMonthsData(months)
+
+      const allCheckIns = await checkInResultRepo.getAll()
+      setCheckInHistory(allCheckIns.sort((a, b) => b.monthKey.localeCompare(a.monthKey)))
     } finally {
       setLoading(false)
     }
@@ -285,6 +293,65 @@ export function AnalyticsPage() {
           </div>
         </div>
       </section>
+
+      {/* ── Check-In History ── */}
+      {checkInHistory.length > 0 && (
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-3">Check-In History</h2>
+
+          {/* Sparkline (3+ check-ins) */}
+          {checkInHistory.length >= 3 && (
+            <div className="flex items-end gap-1 h-10 mb-3">
+              {checkInHistory.slice().reverse().map((ci) => {
+                const h = Math.max(4, Math.min(40, (ci.spendingProgressPercent / 100) * 40))
+                const color = ci.verdict === 'doing_well' ? 'bg-[#A89060]' : 'bg-red-400'
+                return (
+                  <div key={ci.id} className={`${color} rounded-sm flex-1 max-w-8`} style={{ height: `${h}px` }} />
+                )
+              })}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {checkInHistory.map((ci) => {
+              const [y, m] = ci.monthKey.split('-')
+              const label = format(new Date(parseInt(y), parseInt(m) - 1), 'MMM yyyy')
+              const isGood = ci.verdict === 'doing_well'
+
+              return (
+                <button
+                  key={ci.id}
+                  type="button"
+                  onClick={() => setViewingCheckIn(ci)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-[#1E2330] rounded-lg hover:bg-gray-100 dark:hover:bg-[#2E3A4E] transition-colors"
+                >
+                  <div className="text-left">
+                    <div className="text-sm font-medium text-gray-800 dark:text-[#F0EDE4]">{label}</div>
+                    <div className="text-xs text-gray-500 dark:text-[#8A9BAA] truncate max-w-[200px]">
+                      {ci.verdictSummary.split('.')[0]}.
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500 dark:text-[#8A9BAA]">{ci.spendingProgressPercent}%</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      isGood
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {isGood ? 'Doing Well' : 'Fucking Up'}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Check-In Detail Modal */}
+      {viewingCheckIn && (
+        <CheckInHistoryView result={viewingCheckIn} onClose={() => setViewingCheckIn(null)} />
+      )}
 
       {/* ── Drill-down modal ── */}
       {drillDown && (
