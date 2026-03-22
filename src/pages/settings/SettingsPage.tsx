@@ -20,7 +20,6 @@ export function SettingsPage() {
   const [paydayDay, setPaydayDay] = useState('')
   const [monthlyIncome, setMonthlyIncome] = useState('')
   const [apiKey, setApiKey] = useState('')
-  const [apiKeyMasked, setApiKeyMasked] = useState(true)
   const [apiKeyTesting, setApiKeyTesting] = useState(false)
   const [apiKeyStatus, setApiKeyStatus] = useState<'none' | 'valid' | 'invalid'>('none')
 
@@ -264,47 +263,13 @@ export function SettingsPage() {
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               OpenAI API Key
             </label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={apiKey}
-                onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('none') }}
-                onPaste={(e) => {
-                  e.preventDefault()
-                  const pasted = e.clipboardData.getData('text').trim()
-                  setApiKey(pasted)
-                  setApiKeyStatus('none')
-                }}
-                placeholder="sk-..."
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                className={`flex-1 px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm ${apiKeyMasked ? '[-webkit-text-security:disc] [text-security:disc]' : ''}`}
-                style={apiKeyMasked ? { WebkitTextSecurity: 'disc' } as React.CSSProperties : undefined}
-              />
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const text = await navigator.clipboard.readText()
-                    if (text) { setApiKey(text.trim()); setApiKeyStatus('none') }
-                  } catch {
-                    alert('Paste not available. Please long-press the input field to paste.')
-                  }
-                }}
-                className="px-2 py-2 text-xs text-[#A89060] font-medium"
-              >
-                Paste
-              </button>
-              <button
-                type="button"
-                onClick={() => setApiKeyMasked(!apiKeyMasked)}
-                className="px-2 py-2 text-gray-500 dark:text-[#8A9BAA] text-sm"
-              >
-                {apiKeyMasked ? '👁' : '🔒'}
-              </button>
-            </div>
+            <input
+              type="text"
+              value={apiKey}
+              onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('none') }}
+              placeholder="sk-..."
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm"
+            />
             <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
               Your key stays on this device. Only used for mid-month check-ins.
             </p>
