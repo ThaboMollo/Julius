@@ -55,3 +55,19 @@ export function parseDiscovery(csvText: string): ParsedTransaction[] {
 
   return results
 }
+
+export function parseDiscoveryPdf(text: string): ParsedTransaction[] {
+  const lines = text.split('\n')
+  const results: ParsedTransaction[] = []
+
+  for (const line of lines) {
+    // Discovery PDF: "dd Mon yyyy Description Amount" or "yyyy-mm-dd Description Amount"
+    const match = line.match(/(\d{1,2}\s[A-Za-z]{3}\s\d{4}|\d{4}-\d{2}-\d{2})\s+(.+?)\s+([-\d,.]+)\s*$/)
+    if (!match) continue
+    const date = parseDate(match[1])
+    if (!date) continue
+    results.push({ date, amount: parseAmount(match[3]), description: match[2].trim() })
+  }
+
+  return results
+}

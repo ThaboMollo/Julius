@@ -57,3 +57,28 @@ export function parseABSA(csvText: string): ParsedTransaction[] {
 
   return results
 }
+
+export function parseABSAPdf(text: string): ParsedTransaction[] {
+  const lines = text.split('\n')
+  const results: ParsedTransaction[] = []
+
+  for (const line of lines) {
+    // ABSA PDF: "dd/mm/yyyy Description Amount Balance"
+    const match = line.match(/(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([-\d,.]+)\s+([-\d,.]+)\s*$/)
+    if (match) {
+      const date = parseDate(match[1])
+      if (!date) continue
+      results.push({ date, amount: parseAmount(match[3]), description: match[2].trim(), balance: parseAmount(match[4]) || undefined })
+      continue
+    }
+    // Without balance
+    const match2 = line.match(/(\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([-\d,.]+)\s*$/)
+    if (match2) {
+      const date = parseDate(match2[1])
+      if (!date) continue
+      results.push({ date, amount: parseAmount(match2[3]), description: match2[2].trim() })
+    }
+  }
+
+  return results
+}

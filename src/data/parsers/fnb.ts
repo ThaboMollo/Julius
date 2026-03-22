@@ -1,5 +1,5 @@
 import type { ParsedTransaction } from './types'
-import { parseCSVLine, findColumnIndex, normalizeHeader, parseDate } from './helpers'
+import { parseCSVLine, findColumnIndex, normalizeHeader, parseDate, parseAmount } from './helpers'
 
 /**
  * FNB CSV format (typical export):
@@ -52,6 +52,33 @@ export function parseFNB(csvText: string): ParsedTransaction[] {
       description: description || 'Unknown',
       balance: isNaN(balance!) ? undefined : balance,
     })
+  }
+
+  return results
+}
+
+export function parseFNBPdf(text: string): ParsedTransaction[] {
+  const lines = text.split('\n')
+  const results: ParsedTransaction[] = []
+
+  for (const line of lines) {
+    // FNB PDF: "dd Mon yyyy Description Amount Balance" or with debit/credit split
+    const match = line.match(/(\d{1,2}\s[A-Za-z]{3}\s\d{4})\s+(.+?)\s+([-\d,.]+)\s+([-\d,.]+)\s*$/)
+    if (match) {
+      const date = parseDate(match[1])
+      if (!date) continue
+      const description = match[2].trim()
+      const amount = parseAmount(match[3])
+      results.push({ date, amount, description, balance: parseAmount(match[4]) || undefined })
+      continue
+    }
+    // Without balance
+    const match2 = line.match(/(\d{1,2}\s[A-Za-z]{3}\s\d{4})\s+(.+?)\s+([-\d,.]+)\s*$/)
+    if (match2) {
+      const date = parseDate(match2[1])
+      if (!date) continue
+      results.push({ date, amount: parseAmount(match2[3]), description: match2[2].trim() })
+    }
   }
 
   return results

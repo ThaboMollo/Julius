@@ -56,3 +56,19 @@ export function parseCapitec(csvText: string): ParsedTransaction[] {
 
   return results
 }
+
+export function parseCapitecPdf(text: string): ParsedTransaction[] {
+  const lines = text.split('\n')
+  const results: ParsedTransaction[] = []
+
+  for (const line of lines) {
+    // Capitec PDF: "yyyy/mm/dd Description Amount" or "dd/mm/yyyy Description Amount"
+    const match = line.match(/(\d{4}\/\d{2}\/\d{2}|\d{2}\/\d{2}\/\d{4})\s+(.+?)\s+([-\d,.]+)\s*$/)
+    if (!match) continue
+    const date = parseDate(match[1])
+    if (!date) continue
+    results.push({ date, amount: parseAmount(match[3]), description: match[2].trim() })
+  }
+
+  return results
+}
