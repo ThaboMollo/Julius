@@ -1,4 +1,5 @@
 import type { ParsedTransaction } from './types'
+import { parseCSVLine, findColumnIndex, normalizeHeader, parseAmount, resolveDebitCredit, parseDate } from './helpers'
 
 /**
  * Capitec CSV format (typical export):
@@ -8,15 +9,15 @@ export function parseCapitec(csvText: string): ParsedTransaction[] {
   const lines = csvText.split('\n').map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return []
 
-  const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  const header = parseCSVLine(lines[0]).map(normalizeHeader)
 
-  const dateIdx = findIndex(header, ['date'])
-  const descIdx = findIndex(header, ['description', 'desc', 'details', 'narration'])
-  const debitIdx = findIndex(header, ['debit', 'debits'])
-  const creditIdx = findIndex(header, ['credit', 'credits'])
-  const amountIdx = findIndex(header, ['amount'])
-  const balanceIdx = findIndex(header, ['balance'])
-  const refIdx = findIndex(header, ['reference', 'ref'])
+  const dateIdx = findColumnIndex(header, ['date'])
+  const descIdx = findColumnIndex(header, ['description', 'desc', 'details', 'narration'])
+  const debitIdx = findColumnIndex(header, ['debit', 'debits'])
+  const creditIdx = findColumnIndex(header, ['credit', 'credits'])
+  const amountIdx = findColumnIndex(header, ['amount'])
+  const balanceIdx = findColumnIndex(header, ['balance'])
+  const refIdx = findColumnIndex(header, ['reference', 'ref'])
 
   if (dateIdx === -1) return []
 
@@ -32,12 +33,10 @@ export function parseCapitec(csvText: string): ParsedTransaction[] {
 
     let amount: number
     if (amountIdx !== -1) {
-      amount = parseFloat(cols[amountIdx]?.replace(/[,\sR]/g, '') ?? '0') || 0
+      amount = parseAmount(cols[amountIdx])
     } else {
-      const debit = parseFloat(cols[debitIdx]?.replace(/[,\sR]/g, '') ?? '0') || 0
-      const credit = parseFloat(cols[creditIdx]?.replace(/[,\sR]/g, '') ?? '0') || 0
       // Debits are expenses (negative), credits are income (positive)
-      amount = credit > 0 ? credit : -debit
+      amount = resolveDebitCredit(cols[debitIdx], cols[creditIdx])
     }
 
     const description = cols[descIdx]?.trim() || 'Unknown'
@@ -56,46 +55,4 @@ export function parseCapitec(csvText: string): ParsedTransaction[] {
   }
 
   return results
-}
-
-function parseDate(s: string): Date | null {
-  const clean = s.replace(/['"]/g, '').trim()
-  // yyyy-mm-dd / yyyy/mm/dd
-  const m1 = clean.match(/^(\d{4})[/-](\d{2})[/-](\d{2})$/)
-  if (m1) return new Date(parseInt(m1[1]), parseInt(m1[2]) - 1, parseInt(m1[3]))
-  // dd/mm/yyyy
-  const m2 = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-  if (m2) return new Date(parseInt(m2[3]), parseInt(m2[2]) - 1, parseInt(m2[1]))
-  // dd MMM yyyy
-  const m3 = clean.match(/^(\d{1,2})\s([A-Za-z]{3})\s(\d{4})$/)
-  if (m3) return new Date(`${m3[2]} ${m3[1]}, ${m3[3]}`)
-  const fallback = new Date(clean)
-  return isNaN(fallback.getTime()) ? null : fallback
-}
-
-function findIndex(header: string[], candidates: string[]): number {
-  for (const c of candidates) {
-    const idx = header.indexOf(c)
-    if (idx !== -1) return idx
-  }
-  return -1
-}
-
-function parseCSVLine(line: string): string[] {
-  const cols: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '"') {
-      inQuotes = !inQuotes
-    } else if (ch === ',' && !inQuotes) {
-      cols.push(current)
-      current = ''
-    } else {
-      current += ch
-    }
-  }
-  cols.push(current)
-  return cols
 }

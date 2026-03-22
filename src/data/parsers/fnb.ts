@@ -1,4 +1,5 @@
 import type { ParsedTransaction } from './types'
+import { parseCSVLine, findColumnIndex, normalizeHeader, parseDate } from './helpers'
 
 /**
  * FNB CSV format (typical export):
@@ -11,13 +12,13 @@ export function parseFNB(csvText: string): ParsedTransaction[] {
   if (lines.length < 2) return []
 
   // Detect header row to find column indices
-  const header = parseCSVLine(lines[0]).map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''))
+  const header = parseCSVLine(lines[0]).map(normalizeHeader)
 
-  const dateIdx = findIndex(header, ['date'])
-  const amountIdx = findIndex(header, ['amount'])
-  const descIdx = findIndex(header, ['description1', 'description', 'desc', 'narration'])
-  const desc2Idx = findIndex(header, ['description2', 'reference'])
-  const balanceIdx = findIndex(header, ['balance'])
+  const dateIdx = findColumnIndex(header, ['date'])
+  const amountIdx = findColumnIndex(header, ['amount'])
+  const descIdx = findColumnIndex(header, ['description1', 'description', 'desc', 'narration'])
+  const desc2Idx = findColumnIndex(header, ['description2', 'reference'])
+  const balanceIdx = findColumnIndex(header, ['balance'])
 
   if (dateIdx === -1 || amountIdx === -1) return []
 
@@ -29,7 +30,7 @@ export function parseFNB(csvText: string): ParsedTransaction[] {
     const amountStr = cols[amountIdx]?.trim().replace(/[,\s]/g, '')
     if (!dateStr || !amountStr) continue
 
-    const date = parseFNBDate(dateStr)
+    const date = parseDate(dateStr)
     if (!date) continue
 
     const amount = parseFloat(amountStr)
@@ -54,57 +55,4 @@ export function parseFNB(csvText: string): ParsedTransaction[] {
   }
 
   return results
-}
-
-function parseFNBDate(s: string): Date | null {
-  // FNB uses formats: "01 Jan 2025", "2025/01/01", "01/01/2025"
-  const clean = s.replace(/['"]/g, '').trim()
-
-  // dd MMM yyyy
-  const match1 = clean.match(/^(\d{1,2})\s([A-Za-z]{3})\s(\d{4})$/)
-  if (match1) {
-    return new Date(`${match1[2]} ${match1[1]}, ${match1[3]}`)
-  }
-
-  // yyyy/mm/dd or yyyy-mm-dd
-  const match2 = clean.match(/^(\d{4})[/-](\d{2})[/-](\d{2})$/)
-  if (match2) {
-    return new Date(parseInt(match2[1]), parseInt(match2[2]) - 1, parseInt(match2[3]))
-  }
-
-  // dd/mm/yyyy
-  const match3 = clean.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-  if (match3) {
-    return new Date(parseInt(match3[3]), parseInt(match3[2]) - 1, parseInt(match3[1]))
-  }
-
-  const fallback = new Date(clean)
-  return isNaN(fallback.getTime()) ? null : fallback
-}
-
-function findIndex(header: string[], candidates: string[]): number {
-  for (const c of candidates) {
-    const idx = header.indexOf(c)
-    if (idx !== -1) return idx
-  }
-  return -1
-}
-
-function parseCSVLine(line: string): string[] {
-  const cols: string[] = []
-  let current = ''
-  let inQuotes = false
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '"') {
-      inQuotes = !inQuotes
-    } else if (ch === ',' && !inQuotes) {
-      cols.push(current)
-      current = ''
-    } else {
-      current += ch
-    }
-  }
-  cols.push(current)
-  return cols
 }
