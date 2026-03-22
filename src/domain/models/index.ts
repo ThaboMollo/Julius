@@ -1,3 +1,5 @@
+import type { AffordabilityVerdict } from '../rules'
+
 export interface ScopedRecord {
   userId: string
   createdAt: string
@@ -148,6 +150,47 @@ export interface StatementUpload extends ScopedRecord {
   unmatchedCount: number
 }
 
+// Mid-Month Check-In result
+export interface OutsideBudgetItem {
+  description: string
+  amount: number
+  date: string
+  aiComment: string
+  actionTaken?: 'added_transaction' | 'dismissed'
+}
+
+export interface SuggestedBudgetItem {
+  name: string
+  suggestedAmount: number
+  groupId?: string
+  categoryId?: string
+  aiReason: string
+  actionTaken?: 'added_to_budget' | 'dismissed'
+}
+
+export interface PlannerReviewItem {
+  scenarioId: string
+  scenarioName: string
+  previousVerdict: AffordabilityVerdict
+  newVerdict: AffordabilityVerdict
+  newBaselineDisposable: number
+  newRemainingAfterScenario: number
+}
+
+export interface CheckInResult extends ScopedRecord {
+  id: string
+  budgetMonthId: string
+  monthKey: string
+  verdict: 'doing_well' | 'fucking_up'
+  verdictSummary: string
+  spendingProgressPercent: number
+  outsideBudget: OutsideBudgetItem[]
+  suggestedBudgetItems: SuggestedBudgetItem[]
+  plannerReview: PlannerReviewItem[]
+  bankStatementDate: string
+  rawAIResponse: string
+}
+
 // Type for creating new entities (without id and scoped timestamps)
 export type CreateBudgetGroup = Omit<BudgetGroup, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateCategory = Omit<Category, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
@@ -160,3 +203,4 @@ export type CreatePurchaseScenario = Omit<PurchaseScenario, 'id' | 'userId' | 'c
 export type CreateScenarioExpense = Omit<ScenarioExpense, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateBankConfig = Omit<BankConfig, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateStatementUpload = Omit<StatementUpload, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
+export type CreateCheckInResult = Omit<CheckInResult, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
