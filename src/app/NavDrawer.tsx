@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { checkInResultRepo } from '../data/local'
 
 interface NavDrawerProps {
   isOpen: boolean
@@ -17,6 +19,20 @@ const navItems = [
 ]
 
 export function NavDrawer({ isOpen, onClose }: NavDrawerProps) {
+  const [showCheckIn, setShowCheckIn] = useState(false)
+  const [checkInDone, setCheckInDone] = useState(false)
+
+  useEffect(() => {
+    const day = new Date().getDate()
+    setShowCheckIn(day >= 13 && day <= 17)
+
+    if (day >= 13 && day <= 17) {
+      const now = new Date()
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+      checkInResultRepo.getByMonthKey(monthKey).then((r) => setCheckInDone(!!r))
+    }
+  }, [])
+
   return (
     <>
       {/* Backdrop */}
@@ -71,6 +87,25 @@ export function NavDrawer({ isOpen, onClose }: NavDrawerProps) {
               <span className="font-medium">{item.label}</span>
             </NavLink>
           ))}
+          {showCheckIn && (
+            <NavLink
+              to="/check-in"
+              onClick={onClose}
+              className={({ isActive }) =>
+                `flex items-center gap-4 px-5 py-3.5 text-base transition-colors ${
+                  isActive
+                    ? 'text-[#C4A86B] bg-white/10'
+                    : 'text-[#C4A86B] hover:bg-white/5'
+                }`
+              }
+            >
+              <span className="text-xl w-7 text-center">♡</span>
+              <span className="font-medium">Check-In</span>
+              {checkInDone && (
+                <span className="w-2 h-2 rounded-full bg-green-400 ml-auto" />
+              )}
+            </NavLink>
+          )}
         </nav>
       </div>
     </>

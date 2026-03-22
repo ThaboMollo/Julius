@@ -13,6 +13,7 @@ import { RegisterPage } from './pages/auth/RegisterPage'
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage'
 import { AnalyticsPage } from './pages/analytics/AnalyticsPage'
 import { PlannerPage } from './pages/planner/PlannerPage'
+import { CheckInPage } from './pages/check-in/CheckInPage'
 import { MonthProvider } from './app/MonthContext'
 import { SplashScreen } from './app/SplashScreen'
 import { seedDefaults } from './data/local/seed'
@@ -49,6 +50,7 @@ function App() {
           <Route path="planner" element={<PlannerPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="configurations" element={<ConfigurationsPage />} />
+          <Route path="check-in" element={<CheckInPage />} />
         </Route>
       </Routes>
     </MonthProvider>
