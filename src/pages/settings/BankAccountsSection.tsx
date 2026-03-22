@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { bankConfigRepo, statementUploadRepo, transactionRepo, budgetMonthRepo, categoryRepo } from '../../data/local'
 import type { BankConfig, CreateTransaction } from '../../domain/models'
-import { getParserForBank } from '../../data/parsers'
+import { parseStatement, PdfPasswordRequired, PdfScannedImage } from '../../data/parsers'
 import type { ParsedTransaction } from '../../data/parsers'
 import { reconcile } from '../../domain/rules/reconciliation'
 import { formatCurrency, UNCATEGORISED_CATEGORY } from '../../domain/constants'
@@ -42,6 +42,8 @@ export function BankAccountsSection() {
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
   const [reconciliation, setReconciliation] = useState<ReconciliationState | null>(null)
+  const [pdfPasswordPrompt, setPdfPasswordPrompt] = useState<{ bank: BankConfig; files: File[] } | null>(null)
+  const [pdfPassword, setPdfPassword] = useState('')
 
   // Add form state
   const [newBankCode, setNewBankCode] = useState<BankConfig['bankCode']>('fnb')
@@ -89,27 +91,28 @@ export function BankAccountsSection() {
     await load()
   }
 
-  async function handleCSVUpload(bank: BankConfig, file: File) {
+  async function handleUpload(bank: BankConfig, files: File[]) {
     try {
-      const csvText = await file.text()
-      const parser = getParserForBank(bank.bankCode)
-      const parsed = parser(csvText)
+      const result = await parseStatement(bank, files, pdfPassword || undefined)
 
+      if (result.errors.length > 0) {
+        alert(`Warning:\n${result.errors.map((e) => e.message).join('\n')}`)
+      }
+
+      const parsed = result.transactions
       if (parsed.length === 0) {
-        alert('No transactions found in this file. Please check the CSV format.')
+        alert('No transactions found in the uploaded files. Please check the file format.')
         return
       }
 
-      // Load all Julius transactions for the period covered by the CSV
+      // Everything below stays the same — compute date range, reconcile, etc.
       const dates = parsed.map((p) => new Date(p.date).getTime())
       const minDate = new Date(Math.min(...dates))
       const maxDate = new Date(Math.max(...dates))
 
-      // Collect Julius transactions for overlapping months
       const allJuliusTxs = await loadTransactionsForRange(minDate, maxDate)
-      const result = reconcile(parsed, allJuliusTxs)
+      const reconcileResult = reconcile(parsed, allJuliusTxs)
 
-      // Find (or fall back to first) uncategorised category
       const cats = await categoryRepo.getActive()
       const uncategorisedCat = cats.find((c) => c.name === UNCATEGORISED_CATEGORY) ?? cats[0]
       if (!uncategorisedCat) {
@@ -117,30 +120,40 @@ export function BankAccountsSection() {
         return
       }
 
-      // Record the upload
       await statementUploadRepo.create({
         bankConfigId: bank.id,
-        filename: file.name,
+        filename: files.map((f) => f.name).join(', '),
         uploadedAt: new Date(),
         periodStart: minDate,
         periodEnd: maxDate,
         totalTransactions: parsed.length,
-        matchedCount: result.matched.length,
-        unmatchedCount: result.missingFromJulius.length,
+        matchedCount: reconcileResult.matched.length,
+        unmatchedCount: reconcileResult.missingFromJulius.length,
       })
 
       await bankConfigRepo.update(bank.id, { lastUploadAt: new Date() })
       await load()
 
+      setPdfPasswordPrompt(null)
+      setPdfPassword('')
+
       setReconciliation({
         bankConfigId: bank.id,
-        filename: file.name,
-        matched: result.matched,
-        missing: result.missingFromJulius,
+        filename: files.map((f) => f.name).join(', '),
+        matched: reconcileResult.matched,
+        missing: reconcileResult.missingFromJulius,
         uncategorisedCatId: uncategorisedCat.id,
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to process CSV.'
+      if (err instanceof PdfPasswordRequired) {
+        setPdfPasswordPrompt({ bank, files })
+        return
+      }
+      if (err instanceof PdfScannedImage) {
+        alert(err.message)
+        return
+      }
+      const msg = err instanceof Error ? err.message : 'Failed to process files.'
       alert(`Upload error: ${msg}`)
     }
   }
@@ -241,9 +254,46 @@ export function BankAccountsSection() {
               key={bank.id}
               bank={bank}
               onRemove={() => removeBank(bank.id)}
-              onUpload={(file) => handleCSVUpload(bank, file)}
+              onUpload={(files) => void handleUpload(bank, files)}
             />
           ))}
+        </div>
+      )}
+
+      {/* PDF password prompt */}
+      {pdfPasswordPrompt && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow-lg p-6 w-full max-w-sm space-y-4">
+            <h3 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">Password Required</h3>
+            <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+              This PDF is password-protected. For FNB, this is usually your ID number.
+            </p>
+            <input
+              type="password"
+              value={pdfPassword}
+              onChange={(e) => setPdfPassword(e.target.value)}
+              placeholder="Enter PDF password"
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4]"
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void handleUpload(pdfPasswordPrompt.bank, pdfPasswordPrompt.files)
+                }}
+                className="flex-1 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
+              >
+                Unlock & Upload
+              </button>
+              <button
+                type="button"
+                onClick={() => { setPdfPasswordPrompt(null); setPdfPassword('') }}
+                className="flex-1 py-2 bg-gray-200 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -268,7 +318,7 @@ function BankCard({
 }: {
   bank: BankConfig
   onRemove: () => void
-  onUpload: (file: File) => void
+  onUpload: (files: File[]) => void
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -296,16 +346,17 @@ function BankCard({
         onClick={() => fileRef.current?.click()}
         className="w-full py-2 bg-gray-100 dark:bg-[#1E2330] hover:bg-gray-200 dark:hover:bg-[#2E3A4E] text-gray-700 dark:text-[#8A9BAA] rounded-lg text-sm font-medium transition-colors"
       >
-        Upload Statement (.csv)
+        Upload Statement (.csv / .pdf)
       </button>
       <input
         ref={fileRef}
         type="file"
-        accept=".csv"
+        accept=".csv,.pdf"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) onUpload(file)
+          const files = e.target.files
+          if (files && files.length > 0) onUpload(Array.from(files))
           e.target.value = ''
         }}
       />
