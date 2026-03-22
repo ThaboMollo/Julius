@@ -6,6 +6,7 @@ import type { AppSettings } from '../../domain/models'
 import { useTheme } from '../../app/ThemeContext'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../../config/flags'
 import { useAuth } from '../../auth/useAuth'
+import { getOpenAIKey, setOpenAIKey, clearOpenAIKey, testOpenAIKey } from '../../ai/openai'
 
 export function SettingsPage() {
   const { isDark, toggleTheme } = useTheme()
@@ -18,6 +19,10 @@ export function SettingsPage() {
   // Form states
   const [paydayDay, setPaydayDay] = useState('')
   const [monthlyIncome, setMonthlyIncome] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [apiKeyMasked, setApiKeyMasked] = useState(true)
+  const [apiKeyTesting, setApiKeyTesting] = useState(false)
+  const [apiKeyStatus, setApiKeyStatus] = useState<'none' | 'valid' | 'invalid'>('none')
 
   useEffect(() => {
     loadData()
@@ -30,6 +35,8 @@ export function SettingsPage() {
       setSettings(sets)
       setPaydayDay(sets.paydayDayOfMonth.toString())
       setMonthlyIncome(sets.expectedMonthlyIncome?.toString() || '')
+      const existingKey = getOpenAIKey()
+      if (existingKey) setApiKey(existingKey)
     } finally {
       setLoading(false)
     }
@@ -248,6 +255,70 @@ export function SettingsPage() {
 
       {/* Bank Accounts */}
       <BankAccountsSection />
+
+      {/* AI Check-In */}
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">AI Check-In</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+              OpenAI API Key
+            </label>
+            <div className="flex gap-2">
+              <input
+                type={apiKeyMasked ? 'password' : 'text'}
+                value={apiKey}
+                onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('none') }}
+                placeholder="sk-..."
+                className="flex-1 px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setApiKeyMasked(!apiKeyMasked)}
+                className="px-2 py-2 text-gray-500 dark:text-[#8A9BAA] text-sm"
+              >
+                {apiKeyMasked ? '👁' : '🔒'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
+              Your key stays on this device. Only used for mid-month check-ins.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (apiKey.trim()) {
+                  setOpenAIKey(apiKey.trim())
+                  alert('API key saved!')
+                } else {
+                  clearOpenAIKey()
+                  alert('API key removed.')
+                }
+              }}
+              className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] text-sm"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              disabled={!apiKey.trim() || apiKeyTesting}
+              onClick={async () => {
+                setApiKeyTesting(true)
+                setApiKeyStatus('none')
+                const valid = await testOpenAIKey(apiKey.trim())
+                setApiKeyStatus(valid ? 'valid' : 'invalid')
+                setApiKeyTesting(false)
+              }}
+              className="px-3 py-2 border border-[#A89060] text-[#A89060] rounded-lg text-sm disabled:opacity-50"
+            >
+              {apiKeyTesting ? 'Testing...' : 'Test'}
+            </button>
+            {apiKeyStatus === 'valid' && <span className="self-center text-green-500 text-sm">✓ Valid</span>}
+            {apiKeyStatus === 'invalid' && <span className="self-center text-red-500 text-sm">✕ Invalid</span>}
+          </div>
+        </div>
+      </div>
 
     </div>
   )
