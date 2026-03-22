@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "release:patch": "npm version patch -m 'release: v%s' && git push && git push --tags",
+    "release:minor": "npm version minor -m 'release: v%s' && git push && git push --tags",
+    "release:major": "npm version major -m 'release: v%s' && git push && git push --tags"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.97.0",
