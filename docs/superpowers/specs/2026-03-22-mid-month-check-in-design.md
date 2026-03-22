@@ -17,6 +17,8 @@ A mid-month financial health check (available 13th–17th of each month) where t
 | Action model | Actionable — user can log transactions and add budget items directly from results | Reduces friction |
 | Persistence | Saved to IndexedDB, viewable in Analytics history | Enables month-over-month trend tracking |
 | UI pattern | Single page with collapsible sections (Approach 3) | Verdict front-and-centre, drill into detail at own pace |
+| Cloud sync | `checkInResults` excluded from `SyncOrchestrator` — local-only | Check-in data is personal and device-specific |
+| API key storage | Stored in its own `localStorage` key, NOT in `AppSettings` | Prevents accidental sync of API key to Supabase cloud |
 
 ---
 
@@ -59,23 +61,33 @@ interface SuggestedBudgetItem {
 interface PlannerReviewItem {
   scenarioId: string
   scenarioName: string
-  previousVerdict: 'affordable' | 'tight' | 'cannot_afford'
-  newVerdict: 'affordable' | 'tight' | 'cannot_afford'
+  previousVerdict: AffordabilityVerdict  // reuse type from src/domain/rules/index.ts
+  newVerdict: AffordabilityVerdict
   newBaselineDisposable: number
   newRemainingAfterScenario: number
 }
+
+// Create type following existing pattern (see models/index.ts lines 152-162)
+type CreateCheckInResult = Omit<CheckInResult, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 ```
 
 ### Dexie Table
 
 New table `checkInResults` added to JuliusDB schema (version 5):
+- **Must redeclare all existing v4 tables** in the v5 stores block (following the pattern at db.ts v4 lines 87-101), plus the new `checkInResults` table
+- Add class property: `checkInResults!: Table<CheckInResult, string>` to the `JuliusDB` class body
 - Indexes: `[userId+monthKey]`, `budgetMonthId`
 - Follows existing `ScopedRecord` pattern (userId, createdAt, updatedAt, deletedAt)
+- **Excluded from `SyncOrchestrator.ts TABLE_ORDER`** — this table is local-only, not synced to cloud
 
-### AppSettings Extension
+### OpenAI API Key Storage
 
-New field on existing `AppSettings`:
-- `openaiApiKey: string | null` — user's OpenAI API key, stored locally only
+The API key is stored in `localStorage` under key `julius-openai-key` — **not** in the `AppSettings` IndexedDB record. This prevents the key from being synced to Supabase cloud via the existing `appSettings` sync path in `SyncOrchestrator.toCloudRecord`.
+
+Helper functions in `src/ai/openai.ts`:
+- `getOpenAIKey(): string | null` — reads from localStorage
+- `setOpenAIKey(key: string): void` — writes to localStorage
+- `clearOpenAIKey(): void` — removes from localStorage
 
 ---
 
@@ -171,10 +183,11 @@ The planner re-evaluation is pure local math. The AI only produces:
 
 - Heading: "Mid-Month Check-In"
 - Subtext: "Upload your bank statement and let's see how you're doing"
-- Bank selector dropdown (from existing `bankConfigs`)
+- Bank selector dropdown (from existing `bankConfigs`, filtered to `isActive === true` only)
 - CSV file upload button (reuses existing parser infrastructure from `src/data/parsers/`)
-- Guard: if no bank accounts configured → prompt to add in Settings
-- Guard: if no OpenAI API key set → prompt to add in Settings
+- Guard: if no active bank accounts configured → prompt to add in Settings
+- Guard: if no OpenAI API key set (check `localStorage` key `julius-openai-key`) → prompt to add in Settings
+- **CSV parse error handling:** if parsing throws (wrong bank selected, corrupted file), show inline error with the bank name and a suggestion to verify the correct bank was selected. Do not proceed to State 2.
 
 ### State 2: Loading
 
@@ -241,14 +254,21 @@ Horizontal strip of 4 mini cards between verdict and collapsible sections:
 
 For each active `PurchaseScenario`:
 
-1. Get the scenario's current verdict by calling existing `calculateAffordability` with the standard 3-month lookback
-2. Recalculate with **real mid-month data**: replace the current month's `totalActual` with the actual bank statement total (sum of all debits from parsed transactions)
-3. Store both `previousVerdict` and `newVerdict` in `PlannerReviewItem`
+1. **Build `recentMonths` array** using the standard 3-month lookback (same pattern as `PlannerPage.tsx` lines 54-64):
+   - For each of the 3 preceding months: `budgetMonthRepo.getOrCreate(year, month)`
+   - `transactionRepo.getByMonth(bm.id)` → `totalActual(txs)` for actual spending
+   - `expectedIncome = bm.expectedIncome ?? appSettings.expectedMonthlyIncome ?? 0`
+2. **Get current verdict** by calling `calculateAffordability(recentMonths, scenarioMonthlyTotal)`
+3. **Recalculate with real mid-month data**: replace the current month's entry in `recentMonths` with `totalActual = bankStatementDebitSum` (sum of `Math.abs(amount)` for all parsed transactions where `amount < 0`)
+4. Call `calculateAffordability(updatedRecentMonths, scenarioMonthlyTotal)` to get the new verdict
+5. **Compose `PlannerReviewItem`**: `previousVerdict` from step 2, `newVerdict` from step 4, `newBaselineDisposable` and `newRemainingAfterScenario` from the step 4 `AffordabilityResult`
 
 ### Data Sources
 
 - `calculateAffordability` from `src/domain/rules/index.ts` (lines 335-379)
-- Bank statement total: `Math.abs(sum of parsed transactions where amount < 0)`
+- `AffordabilityResult.baselineDisposable` → `PlannerReviewItem.newBaselineDisposable`
+- `AffordabilityResult.remainingAfterScenario` → `PlannerReviewItem.newRemainingAfterScenario`
+- Bank statement debit sum: `Math.abs(sum of parsed transactions where amount < 0)`
 - Scenario expenses: `scenarioExpenseRepo.getByScenario(scenarioId)`
 
 ---
@@ -276,9 +296,9 @@ Positioned below existing "Appearance" toggle on `SettingsPage.tsx`:
 
 - Label: "OpenAI API Key"
 - Password-type input (masked by default, eye icon to reveal)
-- "Save" button → stores to `AppSettings.openaiApiKey` in IndexedDB
+- "Save" button → stores to `localStorage` key `julius-openai-key` (NOT IndexedDB — prevents cloud sync of secret)
 - Helper text: "Your key stays on this device. Only used for mid-month check-ins."
-- "Test" button → minimal API call to validate key, shows green tick or red error
+- "Test" button → minimal API call (`models` endpoint) to validate key works, shows green tick or red error
 
 ---
 
@@ -288,7 +308,8 @@ Positioned below existing "Appearance" toggle on `SettingsPage.tsx`:
 
 In `NavDrawer.tsx`:
 
-- Check `new Date().getDate()` on render — include "Check-In" nav item only if day is 13–17 inclusive
+- The existing `navItems` is a static module-level `const` array. The Check-In item must be rendered **conditionally outside** the `navItems.map()` loop, since it depends on runtime date state.
+- Check `new Date().getDate()` on render — render "Check-In" nav item only if day is 13–17 inclusive
 - Distinct icon (pulse/heartbeat or clipboard-check) with gold accent colour
 - If check-in already completed this month (`checkInResultRepo.getByMonthKey(currentMonthKey)` returns result), show green dot on nav item — user can tap to review results
 - Route `/check-in` still accessible directly outside the window (for Analytics history drill-through), but nav item is hidden
@@ -308,14 +329,13 @@ In `NavDrawer.tsx`:
 | `src/pages/check-in/PlannerReviewSection.tsx` | Collapsible planner re-evaluation section |
 | `src/pages/check-in/SwipeableRow.tsx` | Reusable swipe-to-action row component |
 | `src/pages/check-in/CheckInHistoryView.tsx` | Read-only historical view (used from Analytics) |
-| `src/data/repositories/CheckInResultRepo.ts` | Repository interface |
-| `src/data/local/CheckInResultRepo.dexie.ts` | Dexie implementation |
+| `src/data/local/CheckInResultRepo.dexie.ts` | Dexie implementation (no separate interface file — follows newer repo pattern used by PurchaseScenarioRepo, BankConfigRepo) |
 
 ### Modified Files
 
 | File | Change |
 |------|--------|
-| `src/domain/models/index.ts` | Add `CheckInResult`, `OutsideBudgetItem`, `SuggestedBudgetItem`, `PlannerReviewItem` interfaces |
+| `src/domain/models/index.ts` | Add `CheckInResult`, `OutsideBudgetItem`, `SuggestedBudgetItem`, `PlannerReviewItem` interfaces and `CreateCheckInResult` type |
 | `src/data/local/db.ts` | Add `checkInResults` table in schema v5 |
 | `src/app/NavDrawer.tsx` | Add date-gated "Check-In" nav item |
 | `src/App.tsx` | Add `/check-in` and `/check-in/:monthKey` routes |
@@ -332,7 +352,7 @@ In `NavDrawer.tsx`:
 4. **App gathers context locally** → budget items, transactions, bill ticks, planner scenarios for current month
 5. **Planner recalculation runs locally** → `calculateAffordability` with real mid-month bank data
 6. **Data sent to OpenAI GPT-4o** → structured prompt, returns verdict + outside-budget + suggestions as JSON
-7. **Results composed** → AI response merged with local planner recalculation into `CheckInResult`
+7. **Results composed** → AI response (`verdict`, `verdictSummary`, `outsideBudget`, `suggestedBudgetItems`) merged with local planner recalculation (`plannerReview` array from `calculateAffordability` results) into a single `CheckInResult`, saved to IndexedDB via `checkInResultRepo`
 8. **Results page renders** → confetti/shake animation, sticky verdict card with progress ring, KPI strip, three collapsible sections with swipe actions
 9. **User takes actions** → swipe right to log transactions/add budget items, swipe left to dismiss. Each action updates `CheckInResult` and creates actual records
 10. **Check-in saved to IndexedDB** → viewable from Analytics "Check-In History" section, even after the 17th
