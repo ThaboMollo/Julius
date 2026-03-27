@@ -8,6 +8,7 @@ import type {
   BudgetItem,
   BudgetMonth,
   Category,
+  Commitment,
   PurchaseScenario,
   RecurringTemplate,
   ScenarioExpense,
@@ -25,6 +26,7 @@ const TABLE_ORDER = [
   { local: 'budgetMonths', cloud: 'budget_months' },
   { local: 'recurringTemplates', cloud: 'recurring_templates' },
   { local: 'budgetItems', cloud: 'budget_items' },
+  { local: 'commitments', cloud: 'commitments' },
   { local: 'billTicks', cloud: 'bill_ticks' },
   { local: 'transactions', cloud: 'transactions' },
   { local: 'appSettings', cloud: 'app_settings' },
@@ -433,6 +435,22 @@ function toCloudRecord(
         is_from_template: row.isFromTemplate,
         template_id: row.templateId,
       }
+    case 'commitments':
+      return {
+        ...base,
+        budget_month_id: row.budgetMonthId,
+        category_id: row.categoryId,
+        name: row.name,
+        amount: row.amount,
+        due_date: toIsoDateOnly(row.dueDate as Date | string | null | undefined),
+        type: row.type,
+        status: row.status,
+        is_recurring: row.isRecurring,
+        template_id: row.templateId,
+        paid_transaction_id: row.paidTransactionId,
+        legacy_budget_item_id: row.legacyBudgetItemId,
+        notes: row.notes,
+      }
     case 'billTicks':
       return {
         ...base,
@@ -447,8 +465,12 @@ function toCloudRecord(
         budget_month_id: row.budgetMonthId,
         category_id: row.categoryId,
         budget_item_id: row.budgetItemId,
+        commitment_id: row.commitmentId,
         amount: row.amount,
         date: toIsoDateOnly(row.date as Date | string | null | undefined),
+        kind: row.kind,
+        source: row.source,
+        merchant: row.merchant,
         note: row.note,
       }
     case 'appSettings':
@@ -498,7 +520,7 @@ function fromCloudRecord(
   localTable: (typeof TABLE_ORDER)[number]['local'],
   row: CloudSyncRow,
   userId: string,
-): BudgetGroup | Category | BudgetMonth | RecurringTemplate | BudgetItem | BillTick | Transaction | AppSettings | PurchaseScenario | ScenarioExpense | BankConfig | StatementUpload {
+): BudgetGroup | Category | BudgetMonth | RecurringTemplate | BudgetItem | Commitment | BillTick | Transaction | AppSettings | PurchaseScenario | ScenarioExpense | BankConfig | StatementUpload {
   const base = {
     id: String(row.id),
     userId,
@@ -560,6 +582,22 @@ function fromCloudRecord(
         isFromTemplate: Boolean(row.is_from_template),
         templateId: row.template_id ? String(row.template_id) : null,
       }
+    case 'commitments':
+      return {
+        ...base,
+        budgetMonthId: String(row.budget_month_id ?? ''),
+        categoryId: String(row.category_id ?? ''),
+        name: String(row.name ?? ''),
+        amount: Number(row.amount ?? 0),
+        dueDate: row.due_date ? toDate(row.due_date) : null,
+        type: (row.type ? String(row.type) : 'other') as Commitment['type'],
+        status: (row.status ? String(row.status) : 'upcoming') as Commitment['status'],
+        isRecurring: Boolean(row.is_recurring),
+        templateId: row.template_id ? String(row.template_id) : null,
+        paidTransactionId: row.paid_transaction_id ? String(row.paid_transaction_id) : null,
+        legacyBudgetItemId: row.legacy_budget_item_id ? String(row.legacy_budget_item_id) : null,
+        notes: String(row.notes ?? ''),
+      }
     case 'billTicks':
       return {
         ...base,
@@ -574,8 +612,12 @@ function fromCloudRecord(
         budgetMonthId: String(row.budget_month_id ?? ''),
         categoryId: String(row.category_id ?? ''),
         budgetItemId: row.budget_item_id ? String(row.budget_item_id) : null,
+        commitmentId: row.commitment_id ? String(row.commitment_id) : null,
         amount: Number(row.amount ?? 0),
         date: toDate(row.date),
+        kind: (row.kind ? String(row.kind) : 'expense') as Transaction['kind'],
+        source: (row.source ? String(row.source) : 'manual') as Transaction['source'],
+        merchant: String(row.merchant ?? ''),
         note: String(row.note ?? ''),
       }
     case 'appSettings':

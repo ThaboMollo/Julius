@@ -14,8 +14,17 @@ import type {
   BillTick,
   BudgetGroup,
   Category,
+  Commitment,
 } from '../models'
 import { DEFAULT_PAYDAY_DAY } from '../constants'
+
+function expenseTransactions(transactions: Transaction[]): Transaction[] {
+  return transactions.filter((tx) => (tx.kind ?? 'expense') === 'expense')
+}
+
+function incomeTransactions(transactions: Transaction[]): Transaction[] {
+  return transactions.filter((tx) => tx.kind === 'income')
+}
 
 // Calculate effective planned amount
 export function effectivePlanned(item: BudgetItem): number {
@@ -23,20 +32,14 @@ export function effectivePlanned(item: BudgetItem): number {
 }
 
 // Aggregate planned totals by group
-export function totalPlannedByGroup(
-  items: BudgetItem[],
-  groupId: string
-): number {
+export function totalPlannedByGroup(items: BudgetItem[], groupId: string): number {
   return items
     .filter((item) => item.groupId === groupId)
     .reduce((sum, item) => sum + effectivePlanned(item), 0)
 }
 
 // Aggregate planned totals by category
-export function totalPlannedByCategory(
-  items: BudgetItem[],
-  categoryId: string
-): number {
+export function totalPlannedByCategory(items: BudgetItem[], categoryId: string): number {
   return items
     .filter((item) => item.categoryId === categoryId)
     .reduce((sum, item) => sum + effectivePlanned(item), 0)
@@ -47,61 +50,54 @@ export function totalPlanned(items: BudgetItem[]): number {
   return items.reduce((sum, item) => sum + effectivePlanned(item), 0)
 }
 
+export function totalIncome(transactions: Transaction[]): number {
+  return incomeTransactions(transactions).reduce((sum, tx) => sum + tx.amount, 0)
+}
+
+export function totalExpenses(transactions: Transaction[]): number {
+  return expenseTransactions(transactions).reduce((sum, tx) => sum + tx.amount, 0)
+}
+
 // Aggregate actual spending by item
-export function totalActualByItem(
-  transactions: Transaction[],
-  itemId: string
-): number {
-  return transactions
+export function totalActualByItem(transactions: Transaction[], itemId: string): number {
+  return expenseTransactions(transactions)
     .filter((tx) => tx.budgetItemId === itemId)
     .reduce((sum, tx) => sum + tx.amount, 0)
 }
 
 // Aggregate actual spending by category
-export function totalActualByCategory(
-  transactions: Transaction[],
-  categoryId: string
-): number {
-  return transactions
+export function totalActualByCategory(transactions: Transaction[], categoryId: string): number {
+  return expenseTransactions(transactions)
     .filter((tx) => tx.categoryId === categoryId)
     .reduce((sum, tx) => sum + tx.amount, 0)
 }
 
 // Aggregate actual spending by group
-export function totalActualByGroup(
-  transactions: Transaction[],
-  items: BudgetItem[],
-  groupId: string
-): number {
-  const groupItemIds = new Set(
-    items.filter((item) => item.groupId === groupId).map((item) => item.id)
-  )
-  return transactions
+export function totalActualByGroup(transactions: Transaction[], items: BudgetItem[], groupId: string): number {
+  const groupItemIds = new Set(items.filter((item) => item.groupId === groupId).map((item) => item.id))
+  return expenseTransactions(transactions)
     .filter((tx) => tx.budgetItemId && groupItemIds.has(tx.budgetItemId))
     .reduce((sum, tx) => sum + tx.amount, 0)
 }
 
 // Total actual spending
 export function totalActual(transactions: Transaction[]): number {
-  return transactions.reduce((sum, tx) => sum + tx.amount, 0)
+  return totalExpenses(transactions)
+}
+
+export function netCashflow(transactions: Transaction[]): number {
+  return totalIncome(transactions) - totalExpenses(transactions)
 }
 
 // Overspend (leak) detection for a category
-export function categoryOverspend(
-  items: BudgetItem[],
-  transactions: Transaction[],
-  categoryId: string
-): number {
+export function categoryOverspend(items: BudgetItem[], transactions: Transaction[], categoryId: string): number {
   const planned = totalPlannedByCategory(items, categoryId)
   const actual = totalActualByCategory(transactions, categoryId)
   return Math.max(0, actual - planned)
 }
 
 // Overspend for an item
-export function itemOverspend(
-  item: BudgetItem,
-  transactions: Transaction[]
-): number {
+export function itemOverspend(item: BudgetItem, transactions: Transaction[]): number {
   const planned = effectivePlanned(item)
   const actual = totalActualByItem(transactions, item.id)
   return Math.max(0, actual - planned)
@@ -112,7 +108,7 @@ export function topOverspentCategories(
   items: BudgetItem[],
   transactions: Transaction[],
   categories: Category[],
-  limit: number = 5
+  limit: number = 5,
 ): Array<{ category: Category; overspend: number; planned: number; actual: number }> {
   const results = categories
     .map((category) => {
@@ -129,17 +125,13 @@ export function topOverspentCategories(
 
 // Unbudgeted spending (transactions without a matching budget item)
 export function unbudgetedSpending(transactions: Transaction[]): number {
-  return transactions
+  return expenseTransactions(transactions)
     .filter((tx) => !tx.budgetItemId)
     .reduce((sum, tx) => sum + tx.amount, 0)
 }
 
 // Get payday date for a given month
-export function getPaydayDate(
-  year: number,
-  month: number,
-  paydayDay: number = DEFAULT_PAYDAY_DAY
-): Date {
+export function getPaydayDate(year: number, month: number, paydayDay: number = DEFAULT_PAYDAY_DAY): Date {
   const monthDate = new Date(year, month - 1, 1)
   const lastDayOfMonth = endOfMonth(monthDate).getDate()
   const day = Math.min(paydayDay, lastDayOfMonth)
@@ -150,26 +142,20 @@ export function getPaydayDate(
 export function remainingUntilPayday(
   items: BudgetItem[],
   transactions: Transaction[],
-  expectedIncome: number | null
+  expectedIncome: number | null,
 ): number {
   const planned = totalPlanned(items)
-  const actual = totalActual(transactions)
+  const spent = totalExpenses(transactions)
 
   if (expectedIncome !== null) {
-    // Remaining = Income - Spent
-    return expectedIncome - actual
+    return expectedIncome - spent
   }
 
-  // Remaining = Planned - Spent (budget-based view)
-  return planned - actual
+  return planned - spent
 }
 
 // Days until payday
-export function daysUntilPayday(
-  year: number,
-  month: number,
-  paydayDay: number = DEFAULT_PAYDAY_DAY
-): number {
+export function daysUntilPayday(year: number, month: number, paydayDay: number = DEFAULT_PAYDAY_DAY): number {
   const payday = getPaydayDate(year, month, paydayDay)
   const today = new Date()
   const diff = differenceInDays(payday, today)
@@ -190,7 +176,7 @@ export function getBillDueStatus(
   billTick: BillTick | undefined,
   year: number,
   month: number,
-  paydayDay: number = DEFAULT_PAYDAY_DAY
+  paydayDay: number = DEFAULT_PAYDAY_DAY,
 ): BillDueStatus {
   if (billTick?.isPaid) {
     return 'paid'
@@ -224,23 +210,37 @@ export function getBillDueStatus(
   return 'upcoming'
 }
 
+export function getCommitmentStatus(commitment: Commitment): BillDueStatus {
+  if (commitment.status === 'paid') return 'paid'
+  if (!commitment.dueDate) return 'upcoming'
+
+  const dueDate = new Date(commitment.dueDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  if (isToday(dueDate)) return 'due_today'
+  if (isTomorrow(dueDate)) return 'due_tomorrow'
+  if (isBefore(dueDate, today)) return 'overdue'
+  return 'upcoming'
+}
+
 // Timeline event types
 export interface TimelineEvent {
   date: Date
-  type: 'bill' | 'payday'
+  type: 'commitment' | 'payday'
   item?: BudgetItem
+  commitment?: Commitment
   amount: number
   runningBalance?: number
 }
 
 // Build timeline projection
 export function buildTimeline(
-  items: BudgetItem[],
-  billTicks: BillTick[],
+  commitments: Commitment[],
   year: number,
   month: number,
   startingBalance: number,
-  paydayDay: number = DEFAULT_PAYDAY_DAY
+  paydayDay: number = DEFAULT_PAYDAY_DAY,
 ): TimelineEvent[] {
   const events: TimelineEvent[] = []
   const today = new Date()
@@ -250,39 +250,30 @@ export function buildTimeline(
   const monthEnd = endOfMonth(new Date(year, month - 1, 1))
   const endDate = isAfter(monthEnd, payday) ? monthEnd : payday
 
-  // Add bill events (unpaid only)
-  const billTickMap = new Map(billTicks.map((bt) => [bt.budgetItemId, bt]))
-
-  items
-    .filter((item) => item.isBill && item.dueDate)
-    .forEach((item) => {
-      const tick = billTickMap.get(item.id)
-      if (!tick?.isPaid) {
-        const dueDate = new Date(item.dueDate!)
-        if (!isBefore(dueDate, today) && !isAfter(dueDate, endDate)) {
-          events.push({
-            date: dueDate,
-            type: 'bill',
-            item,
-            amount: -effectivePlanned(item),
-          })
-        }
+  commitments
+    .filter((commitment) => commitment.status !== 'paid' && commitment.dueDate)
+    .forEach((commitment) => {
+      const dueDate = new Date(commitment.dueDate as Date)
+      if (!isBefore(dueDate, today) && !isAfter(dueDate, endDate)) {
+        events.push({
+          date: dueDate,
+          type: 'commitment',
+          commitment,
+          amount: -commitment.amount,
+        })
       }
     })
 
-  // Add payday
   if (!isBefore(payday, today)) {
     events.push({
       date: payday,
       type: 'payday',
-      amount: 0, // Will be updated if income is known
+      amount: 0,
     })
   }
 
-  // Sort by date
   events.sort((a, b) => a.date.getTime() - b.date.getTime())
 
-  // Calculate running balance
   let balance = startingBalance
   events.forEach((event) => {
     balance += event.amount
@@ -301,11 +292,7 @@ export interface GroupSummary {
   overspend: number
 }
 
-export function getGroupSummaries(
-  groups: BudgetGroup[],
-  items: BudgetItem[],
-  transactions: Transaction[]
-): GroupSummary[] {
+export function getGroupSummaries(groups: BudgetGroup[], items: BudgetItem[], transactions: Transaction[]): GroupSummary[] {
   return groups
     .filter((g) => g.isActive)
     .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -318,6 +305,127 @@ export function getGroupSummaries(
     })
 }
 
+export function getRecentTransactions(transactions: Transaction[], limit: number = 5): Transaction[] {
+  return [...transactions]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, limit)
+}
+
+export function getUpcomingCommitments(commitments: Commitment[], limit: number = 5): Commitment[] {
+  return commitments
+    .filter((commitment) => commitment.status !== 'paid')
+    .sort((a, b) => {
+      const aTime = a.dueDate ? new Date(a.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+      const bTime = b.dueDate ? new Date(b.dueDate).getTime() : Number.MAX_SAFE_INTEGER
+      return aTime - bTime
+    })
+    .slice(0, limit)
+}
+
+export interface PotentialSavingsItem {
+  label: string
+  amount: number
+  reason: string
+}
+
+export function getPotentialSavings(
+  transactions: Transaction[],
+  categories: Category[],
+  items: BudgetItem[],
+  limit: number = 3,
+): PotentialSavingsItem[] {
+  const overspends = topOverspentCategories(items, transactions, categories, limit).map((entry) => ({
+    label: entry.category.name,
+    amount: entry.overspend,
+    reason: 'Over planned spend this month',
+  }))
+
+  const repeatedMerchants = Array.from(
+    expenseTransactions(transactions)
+      .filter((tx) => tx.merchant.trim().length > 0)
+      .reduce((acc, tx) => {
+        const key = tx.merchant.trim().toLowerCase()
+        const current = acc.get(key) ?? { label: tx.merchant.trim(), amount: 0, count: 0 }
+        current.amount += tx.amount
+        current.count += 1
+        acc.set(key, current)
+        return acc
+      }, new Map<string, { label: string; amount: number; count: number }>())
+      .values(),
+  )
+    .filter((entry) => entry.count >= 2)
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit)
+    .map((entry) => ({
+      label: entry.label,
+      amount: entry.amount,
+      reason: 'Repeated expense this month',
+    }))
+
+  return [...overspends, ...repeatedMerchants]
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit)
+}
+
+function buildCategoryGroupNameMap(categories: Category[], groups: BudgetGroup[]): Map<string, string> {
+  const groupsById = new Map(groups.map((group) => [group.id, group.name]))
+  return new Map(categories.map((category) => [category.id, groupsById.get(category.groupId) ?? '']))
+}
+
+export function savingsProtected(items: BudgetItem[], groups: BudgetGroup[]): number {
+  const savingsGroup = groups.find((group) => group.name === 'Savings')
+  if (!savingsGroup) return 0
+  return totalPlannedByGroup(items, savingsGroup.id)
+}
+
+export function commitmentsProtected(
+  commitments: Commitment[],
+  categories: Category[],
+  groups: BudgetGroup[],
+): { needs: number; liabilities: number } {
+  const categoryGroupNames = buildCategoryGroupNameMap(categories, groups)
+
+  return commitments
+    .filter((commitment) => commitment.status !== 'paid')
+    .reduce(
+      (acc, commitment) => {
+        const groupName = categoryGroupNames.get(commitment.categoryId)
+        if (groupName === 'Needs') acc.needs += commitment.amount
+        if (groupName === 'Liabilities') acc.liabilities += commitment.amount
+        return acc
+      },
+      { needs: 0, liabilities: 0 },
+    )
+}
+
+export function discretionaryExpensesRecorded(
+  transactions: Transaction[],
+  categories: Category[],
+  groups: BudgetGroup[],
+): number {
+  const categoryGroupNames = buildCategoryGroupNameMap(categories, groups)
+  return expenseTransactions(transactions)
+    .filter((tx) => categoryGroupNames.get(tx.categoryId) === 'Wants')
+    .reduce((sum, tx) => sum + tx.amount, 0)
+}
+
+export function safeToSpend(
+  items: BudgetItem[],
+  transactions: Transaction[],
+  commitments: Commitment[],
+  categories: Category[],
+  groups: BudgetGroup[],
+): number {
+  const income = totalIncome(transactions)
+  if (income <= 0) return 0
+
+  const protectedCommitments = commitmentsProtected(commitments, categories, groups)
+  const savings = savingsProtected(items, groups)
+  const wantsSpend = discretionaryExpensesRecorded(transactions, categories, groups)
+
+  return income - protectedCommitments.needs - protectedCommitments.liabilities - savings - wantsSpend
+}
+
 // ─────────────────────────────────────────────
 // Affordability calculation
 // ─────────────────────────────────────────────
@@ -325,16 +433,16 @@ export function getGroupSummaries(
 export type AffordabilityVerdict = 'affordable' | 'tight' | 'cannot_afford'
 
 export interface AffordabilityResult {
-  baselineDisposable: number    // avg monthly disposable over recent months
+  baselineDisposable: number
   spendingTrend: 'increasing' | 'decreasing' | 'stable'
-  newMonthlyObligations: number // sum of scenario expenses
+  newMonthlyObligations: number
   remainingAfterScenario: number
   verdict: AffordabilityVerdict
 }
 
 export function calculateAffordability(
   recentMonths: { totalActual: number; expectedIncome: number }[],
-  scenarioMonthlyTotal: number
+  scenarioMonthlyTotal: number,
 ): AffordabilityResult {
   if (recentMonths.length === 0) {
     return {
@@ -342,32 +450,27 @@ export function calculateAffordability(
       spendingTrend: 'stable',
       newMonthlyObligations: scenarioMonthlyTotal,
       remainingAfterScenario: -scenarioMonthlyTotal,
-      verdict: scenarioMonthlyTotal === 0 ? 'affordable' : 'cannot_afford',
+      verdict: 'cannot_afford',
     }
   }
 
-  const disposables = recentMonths.map((m) => m.expectedIncome - m.totalActual)
-  const baselineDisposable = disposables.reduce((s, d) => s + d, 0) / disposables.length
+  const disposableValues = recentMonths.map((m) => m.expectedIncome - m.totalActual)
+  const baselineDisposable = disposableValues.reduce((sum, value) => sum + value, 0) / disposableValues.length
 
-  // Trend: compare first half avg vs second half avg of actuals
-  const actuals = recentMonths.map((m) => m.totalActual)
-  const mid = Math.floor(actuals.length / 2)
-  const firstHalfAvg = actuals.slice(0, mid || 1).reduce((s, v) => s + v, 0) / (mid || 1)
-  const secondHalfAvg = actuals.slice(mid).reduce((s, v) => s + v, 0) / (actuals.length - mid)
-  const trendDiff = secondHalfAvg - firstHalfAvg
-  const spendingTrend: AffordabilityResult['spendingTrend'] =
-    trendDiff > 100 ? 'increasing' : trendDiff < -100 ? 'decreasing' : 'stable'
+  let spendingTrend: 'increasing' | 'decreasing' | 'stable' = 'stable'
+  if (recentMonths.length >= 2) {
+    const first = recentMonths[0].totalActual
+    const last = recentMonths[recentMonths.length - 1].totalActual
+    const delta = last - first
+    if (delta > 200) spendingTrend = 'increasing'
+    else if (delta < -200) spendingTrend = 'decreasing'
+  }
 
   const remainingAfterScenario = baselineDisposable - scenarioMonthlyTotal
 
-  let verdict: AffordabilityVerdict
-  if (remainingAfterScenario < 0) {
-    verdict = 'cannot_afford'
-  } else if (baselineDisposable > 0 && remainingAfterScenario / baselineDisposable < 0.2) {
-    verdict = 'tight'
-  } else {
-    verdict = 'affordable'
-  }
+  let verdict: AffordabilityVerdict = 'affordable'
+  if (remainingAfterScenario < 0) verdict = 'cannot_afford'
+  else if (remainingAfterScenario < baselineDisposable * 0.2) verdict = 'tight'
 
   return {
     baselineDisposable,

@@ -8,6 +8,7 @@ import type {
   CreateBudgetGroup,
   CreateCategory,
   CreateRecurringTemplate,
+  RecurringTemplateTargetKind,
 } from '../../domain/models'
 import { formatCurrency } from '../../domain/constants'
 
@@ -245,7 +246,7 @@ export function ConfigurationsPage() {
         </div>
         {templates.length === 0 ? (
           <div className="p-4 text-center text-gray-500 dark:text-[#8A9BAA] text-sm">
-            No recurring templates. Add templates to auto-populate each month's budget.
+            No recurring templates. Add templates to auto-populate monthly plan or commitment items.
           </div>
         ) : (
           <div className="divide-y dark:divide-[#2E3A4E]">
@@ -253,6 +254,7 @@ export function ConfigurationsPage() {
               const group = groups.find((g) => g.id === tmpl.groupId)
               const category = categories.find((c) => c.id === tmpl.categoryId)
               const effective = tmpl.plannedAmount * tmpl.multiplier * tmpl.splitRatio
+              const targetKind = tmpl.targetKind ?? (tmpl.isBill ? 'commitment' : 'budget_item')
 
               return (
                 <div key={tmpl.id} className={`p-4 ${!tmpl.isActive ? 'bg-gray-50 dark:bg-[#1E2330] opacity-60' : ''}`}>
@@ -260,9 +262,9 @@ export function ConfigurationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{tmpl.name}</span>
-                        {tmpl.isBill && (
+                        {targetKind === 'commitment' && (
                           <span className="text-xs bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B] px-1.5 py-0.5 rounded">
-                            Bill
+                            Commitment
                           </span>
                         )}
                         {!tmpl.isActive && (
@@ -272,10 +274,10 @@ export function ConfigurationsPage() {
                         )}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
-                        {group?.name} · {category?.name}
+                        {group?.name} · {category?.name} · {targetKind === 'commitment' ? 'Commitment' : 'Budget item'}
                         {tmpl.multiplier !== 1 && ` × ${tmpl.multiplier}`}
                         {tmpl.splitRatio !== 1 && ` × ${tmpl.splitRatio}`}
-                        {tmpl.isBill && tmpl.dueDayOfMonth && ` · Due: ${tmpl.dueDayOfMonth}th`}
+                        {targetKind === 'commitment' && tmpl.dueDayOfMonth && ` · Due: ${tmpl.dueDayOfMonth}th`}
                       </div>
                     </div>
                     <div className="text-right">
@@ -537,6 +539,9 @@ function TemplateModal({
   const [multiplier, setMultiplier] = useState(template?.multiplier?.toString() || '1')
   const [splitRatio, setSplitRatio] = useState(template?.splitRatio?.toString() || '1')
   const [isBill, setIsBill] = useState(template?.isBill || false)
+  const [targetKind, setTargetKind] = useState<RecurringTemplateTargetKind>(
+    template?.targetKind ?? (template?.isBill ? 'commitment' : 'budget_item')
+  )
   const [dueDayOfMonth, setDueDayOfMonth] = useState(template?.dueDayOfMonth?.toString() || '')
 
   const filteredCategories = categories.filter((c) => c.groupId === groupId)
@@ -577,8 +582,9 @@ function TemplateModal({
               plannedAmount: amount,
               multiplier: parseFloat(multiplier) || 1,
               splitRatio: parseFloat(splitRatio) || 1,
-              isBill,
-              dueDayOfMonth: isBill && dueDayOfMonth ? parseInt(dueDayOfMonth, 10) : null,
+              isBill: targetKind === 'commitment' ? isBill : false,
+              targetKind,
+              dueDayOfMonth: targetKind === 'commitment' && dueDayOfMonth ? parseInt(dueDayOfMonth, 10) : null,
               isActive: true,
             })
           }}
@@ -659,29 +665,45 @@ function TemplateModal({
           </div>
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This is a bill</label>
-              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Set a monthly due day</p>
+              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">Template target</label>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Choose whether this creates a budget item or a commitment each month</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsBill(!isBill)}
-              className={`relative w-12 h-6 rounded-full transition-colors ${isBill ? 'bg-[#A89060]' : 'bg-gray-300 dark:bg-[#2E3A4E]'}`}
+            <select
+              value={targetKind}
+              onChange={(e) => setTargetKind(e.target.value as RecurringTemplateTargetKind)}
+              className="px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
             >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${isBill ? 'translate-x-6' : ''}`} />
-            </button>
+              <option value="budget_item">Budget item</option>
+              <option value="commitment">Commitment</option>
+            </select>
           </div>
-          {isBill && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Due Day of Month</label>
-              <input
-                type="number"
-                min="1"
-                max="31"
-                value={dueDayOfMonth}
-                onChange={(e) => setDueDayOfMonth(e.target.value)}
-                className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
-              />
-            </div>
+          {targetKind === 'commitment' && (
+            <>
+              <div className="flex items-center justify-between py-2">
+                <div>
+                  <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">Bill-style commitment</label>
+                  <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Use this for due-date driven monthly obligations</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBill(!isBill)}
+                  className={`relative w-12 h-6 rounded-full transition-colors ${isBill ? 'bg-[#A89060]' : 'bg-gray-300 dark:bg-[#2E3A4E]'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${isBill ? 'translate-x-6' : ''}`} />
+                </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Due Day of Month</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={dueDayOfMonth}
+                  onChange={(e) => setDueDayOfMonth(e.target.value)}
+                  className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+                />
+              </div>
+            </>
           )}
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg">Cancel</button>

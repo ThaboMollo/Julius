@@ -3,16 +3,16 @@ import { formatCurrency } from '../../domain/constants'
 interface KPISummaryStripProps {
   spentSoFar: number
   budgetRemaining: number
-  billsLeftCount: number
-  billsLeftAmount: number
+  commitmentsLeftCount: number
+  commitmentsLeftAmount: number
   daysToPayday: number
 }
 
 export function KPISummaryStrip({
   spentSoFar,
   budgetRemaining,
-  billsLeftCount,
-  billsLeftAmount,
+  commitmentsLeftCount,
+  commitmentsLeftAmount,
   daysToPayday,
 }: KPISummaryStripProps) {
   const cards = [
@@ -22,7 +22,7 @@ export function KPISummaryStrip({
       value: formatCurrency(budgetRemaining),
       color: budgetRemaining >= 0 ? 'text-[#A89060]' : 'text-red-500',
     },
-    { label: 'Bills left', value: `${billsLeftCount} (${formatCurrency(billsLeftAmount)})`, color: 'text-gray-800 dark:text-[#F0EDE4]' },
+    { label: 'Commitments left', value: `${commitmentsLeftCount} (${formatCurrency(commitmentsLeftAmount)})`, color: 'text-gray-800 dark:text-[#F0EDE4]' },
     { label: 'Days to payday', value: `${daysToPayday}`, color: 'text-gray-800 dark:text-[#F0EDE4]' },
   ]
 

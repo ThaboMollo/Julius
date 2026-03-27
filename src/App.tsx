@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Layout } from './app/Layout'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { BudgetPage } from './pages/budget/BudgetPage'
-import { BillsPage } from './pages/bills/BillsPage'
+import { CommitmentsPage } from './pages/bills/BillsPage'
 import { TimelinePage } from './pages/timeline/TimelinePage'
 import { TransactionsPage } from './pages/transactions/TransactionsPage'
 import { SettingsPage } from './pages/settings/SettingsPage'
@@ -17,7 +17,7 @@ import { CheckInPage } from './pages/check-in/CheckInPage'
 import { MonthProvider } from './app/MonthContext'
 import { SplashScreen } from './app/SplashScreen'
 import { seedDefaults } from './data/local/seed'
-import { migratePaidBillsToTransactions } from './data/local/migrations'
+import { initializeLocalData } from './data/local/migrations'
 
 function App() {
   const [dbReady, setDbReady] = useState(false)
@@ -41,7 +41,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    Promise.all([seedDefaults(), migratePaidBillsToTransactions()]).then(() => setDbReady(true))
+    seedDefaults()
+      .then(() => initializeLocalData())
+      .then(() => setDbReady(true))
   }, [])
 
   const handleSplashDone = useCallback(() => setSplashDone(true), [])
@@ -66,7 +68,8 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="budget" element={<BudgetPage />} />
-          <Route path="bills" element={<BillsPage />} />
+          <Route path="bills" element={<Navigate to="/commitments" replace />} />
+          <Route path="commitments" element={<CommitmentsPage />} />
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="transactions" element={<TransactionsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />

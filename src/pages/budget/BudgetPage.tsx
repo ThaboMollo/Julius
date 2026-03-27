@@ -67,7 +67,7 @@ export function BudgetPage() {
       items.filter((i) => i.templateId).map((i) => i.templateId)
     )
 
-    const newTemplates = templates.filter((t) => !existingTemplateIds.has(t.id))
+    const newTemplates = templates.filter((t) => (t.targetKind ?? 'budget_item') === 'budget_item' && !existingTemplateIds.has(t.id))
     if (newTemplates.length === 0) {
       alert('All templates already added for this month')
       return
@@ -212,7 +212,7 @@ export function BudgetPage() {
                             </span>
                             {item.isBill && (
                               <span className="text-xs bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B] px-1.5 py-0.5 rounded">
-                                Bill
+                                Commitment
                               </span>
                             )}
                             {item.isFromTemplate && (

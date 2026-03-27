@@ -7,6 +7,13 @@ export interface ScopedRecord {
   deletedAt: string | null
 }
 
+export type TransactionKind = 'income' | 'expense'
+export type TransactionSource = 'manual' | 'commitment' | 'import'
+export type CommitmentType = 'bill' | 'debt' | 'subscription' | 'other'
+export type CommitmentStatus = 'upcoming' | 'paid' | 'skipped' | 'overdue'
+export type RecurringTemplateTargetKind = 'budget_item' | 'commitment'
+export type RecurringGenerationOutputKind = 'budget_item' | 'commitment'
+
 // Budget Group - e.g., "Needs", "Should Die"
 export interface BudgetGroup extends ScopedRecord {
   id: string
@@ -56,9 +63,29 @@ export interface Transaction extends ScopedRecord {
   budgetMonthId: string
   categoryId: string
   budgetItemId: string | null // can be null for unbudgeted spend
+  commitmentId: string | null
   amount: number
   date: Date
+  kind: TransactionKind
+  source: TransactionSource
+  merchant: string
   note: string
+}
+
+export interface Commitment extends ScopedRecord {
+  id: string
+  budgetMonthId: string
+  categoryId: string
+  name: string
+  amount: number
+  dueDate: Date | null
+  type: CommitmentType
+  status: CommitmentStatus
+  isRecurring: boolean
+  templateId: string | null
+  paidTransactionId: string | null
+  legacyBudgetItemId: string | null
+  notes: string
 }
 
 // Bill Tick - tracks whether a bill has been paid for a specific month
@@ -82,6 +109,15 @@ export interface RecurringTemplate extends ScopedRecord {
   isBill: boolean
   dueDayOfMonth: number | null // 1-31, only for bills
   isActive: boolean
+  targetKind?: RecurringTemplateTargetKind
+}
+
+export interface RecurringGenerationJournalEntry extends ScopedRecord {
+  id: string
+  templateId: string
+  monthKey: string
+  outputKind: RecurringGenerationOutputKind
+  generatedRecordId: string
 }
 
 // App Settings
@@ -196,9 +232,16 @@ export type CreateBudgetGroup = Omit<BudgetGroup, 'id' | 'userId' | 'createdAt' 
 export type CreateCategory = Omit<Category, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateBudgetMonth = Omit<BudgetMonth, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateBudgetItem = Omit<BudgetItem, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
-export type CreateTransaction = Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
+export type CreateTransaction = Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'commitmentId' | 'kind' | 'source' | 'merchant'> & {
+  commitmentId?: string | null
+  kind?: TransactionKind
+  source?: TransactionSource
+  merchant?: string
+}
+export type CreateCommitment = Omit<Commitment, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateBillTick = Omit<BillTick, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateRecurringTemplate = Omit<RecurringTemplate, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
+export type CreateRecurringGenerationJournalEntry = Omit<RecurringGenerationJournalEntry, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreatePurchaseScenario = Omit<PurchaseScenario, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateScenarioExpense = Omit<ScenarioExpense, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>
 export type CreateBankConfig = Omit<BankConfig, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'deletedAt'>

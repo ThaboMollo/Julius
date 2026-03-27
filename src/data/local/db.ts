@@ -7,6 +7,8 @@ import type {
   Transaction as TxModel,
   BillTick,
   RecurringTemplate,
+  Commitment,
+  RecurringGenerationJournalEntry,
   AppSettings,
   PurchaseScenario,
   ScenarioExpense,
@@ -23,8 +25,10 @@ export class JuliusDB extends Dexie {
   budgetMonths!: Table<BudgetMonth, string>
   budgetItems!: Table<BudgetItem, string>
   transactions!: Table<TxModel, string>
+  commitments!: Table<Commitment, string>
   billTicks!: Table<BillTick, string>
   recurringTemplates!: Table<RecurringTemplate, string>
+  recurringGenerationJournal!: Table<RecurringGenerationJournalEntry, string>
   appSettings!: Table<AppSettings, string>
   purchaseScenarios!: Table<PurchaseScenario, string>
   scenarioExpenses!: Table<ScenarioExpense, string>
@@ -123,6 +127,45 @@ export class JuliusDB extends Dexie {
       syncStateLocal: 'id, userId, lastSyncAt',
       checkInResults: 'id, userId, monthKey, budgetMonthId, [userId+monthKey]',
     })
+
+    this.version(6)
+      .stores({
+        budgetGroups: 'id, userId, name, sortOrder, isActive, [userId+isActive]',
+        categories: 'id, userId, name, groupId, isActive, [userId+groupId]',
+        budgetMonths: 'id, userId, monthKey, year, month, [userId+monthKey], [userId+year+month]',
+        budgetItems: 'id, userId, budgetMonthId, groupId, categoryId, isBill, templateId, [userId+budgetMonthId+groupId], [userId+budgetMonthId+categoryId]',
+        transactions: 'id, userId, budgetMonthId, categoryId, budgetItemId, commitmentId, kind, source, date, [userId+budgetMonthId+date], [userId+budgetMonthId+kind], [userId+commitmentId]',
+        commitments: 'id, userId, budgetMonthId, categoryId, type, status, dueDate, templateId, legacyBudgetItemId, [userId+budgetMonthId], [userId+status], [userId+legacyBudgetItemId]',
+        billTicks: 'id, userId, budgetMonthId, budgetItemId, [userId+budgetMonthId+budgetItemId]',
+        recurringTemplates: 'id, userId, groupId, categoryId, isActive, isBill, targetKind, [userId+groupId]',
+        recurringGenerationJournal: 'id, userId, templateId, monthKey, outputKind, generatedRecordId, [userId+templateId+monthKey+outputKind]',
+        appSettings: 'id, userId',
+        purchaseScenarios: 'id, userId',
+        scenarioExpenses: 'id, userId, scenarioId',
+        bankConfigs: 'id, userId, bankCode',
+        statementUploads: 'id, userId, bankConfigId',
+        migrationJournal: 'id, userId, status',
+        syncStateLocal: 'id, userId, lastSyncAt',
+        checkInResults: 'id, userId, monthKey, budgetMonthId, [userId+monthKey]',
+      })
+      .upgrade(async (tx) => {
+        const now = new Date().toISOString()
+
+        await tx.table('transactions').toCollection().modify((record: Record<string, unknown>) => {
+          if (!record.kind) record.kind = 'expense'
+          if (!record.source) record.source = 'manual'
+          if (typeof record.merchant !== 'string') record.merchant = ''
+          if (!Object.prototype.hasOwnProperty.call(record, 'commitmentId')) record.commitmentId = null
+          record.updatedAt = now
+        })
+
+        await tx.table('recurringTemplates').toCollection().modify((record: Record<string, unknown>) => {
+          if (!record.targetKind) {
+            record.targetKind = record.isBill ? 'budget_item' : 'budget_item'
+          }
+          record.updatedAt = now
+        })
+      })
   }
 }
 
@@ -134,8 +177,10 @@ async function stampAllTables(tx: Transaction): Promise<void> {
     'budgetMonths',
     'budgetItems',
     'transactions',
+    'commitments',
     'billTicks',
     'recurringTemplates',
+    'recurringGenerationJournal',
     'appSettings',
     'purchaseScenarios',
     'scenarioExpenses',

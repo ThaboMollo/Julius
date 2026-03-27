@@ -1,29 +1,56 @@
 // Default Budget Groups
 export const DEFAULT_GROUPS = [
   { name: 'Needs', sortOrder: 1 },
-  { name: 'Should Die', sortOrder: 2 },
-  { name: 'Imports', sortOrder: 3 },
+  { name: 'Wants', sortOrder: 2 },
+  { name: 'Savings', sortOrder: 3 },
+  { name: 'Liabilities', sortOrder: 4 },
 ] as const
 
 // Default Categories by Group
 export const DEFAULT_CATEGORIES = {
   'Needs': [
-    'Rent',
-    'Utilities',
     'Groceries',
-    'Transport',
-    'Medical',
     'Insurance',
+    'Rent',
+    'Transport',
+    'Utilities',
+  ],
+  'Wants': [
+    'Entertainment',
+    'Eating Out',
+    'Shopping',
+    'Subscriptions',
+  ],
+  'Savings': [
+    'Emergency Fund',
+    'Investments',
+  ],
+  'Liabilities': [
+    'Car Payment',
+    'Credit Card',
+    'Debt Repayment',
+    'Personal Loan',
+  ],
+  'Imports': [
+    'Income',
+    'Uncategorised',
+  ],
+} as const
+
+export const LEGACY_DEFAULT_GROUP_RENAMES = {
+  'Should Die': 'Wants',
+} as const
+
+export const LEGACY_DEFAULT_CATEGORIES = {
+  'Needs': [
+    'Medical',
     'Phone/Internet',
   ],
-  'Should Die': [
-    'Eating Out',
-    'Entertainment',
-    'Subscriptions',
-    'Shopping',
+  'Wants': [
     'Personal Care',
   ],
   'Imports': [
+    'Income',
     'Uncategorised',
   ],
 } as const

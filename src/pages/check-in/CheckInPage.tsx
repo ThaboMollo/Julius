@@ -7,7 +7,7 @@ import {
   budgetMonthRepo,
   budgetItemRepo,
   transactionRepo,
-  billTickRepo,
+  commitmentRepo,
   budgetGroupRepo,
   categoryRepo,
   settingsRepo,
@@ -27,7 +27,7 @@ import type {
   BudgetItem,
   BudgetGroup,
 } from '../../domain/models'
-import { totalPlanned, totalActual, calculateAffordability, effectivePlanned } from '../../domain/rules'
+import { totalPlanned, totalActual, calculateAffordability } from '../../domain/rules'
 import { UNCATEGORISED_CATEGORY } from '../../domain/constants'
 import { VerdictCard } from './VerdictCard'
 import { KPISummaryStrip } from './KPISummaryStrip'
@@ -83,7 +83,7 @@ export function CheckInPage() {
   const [allGroups, setAllGroups] = useState<BudgetGroup[]>([])
   const [budgetMonthId, setBudgetMonthId] = useState('')
   const [bankDebitTotal, setBankDebitTotal] = useState(0)
-  const [billTicks, setBillTicks] = useState<import('../../domain/models').BillTick[]>([])
+  const [commitments, setCommitments] = useState<import('../../domain/models').Commitment[]>([])
   const [paydayDay, setPaydayDay] = useState(25)
 
   // Sticky scroll state
@@ -130,11 +130,11 @@ export function CheckInPage() {
       const settings = await settingsRepo.get()
       setPaydayDay(settings.paydayDayOfMonth)
       const bm = await budgetMonthRepo.getOrCreate(year, month)
-      const [ticks, items] = await Promise.all([
-        billTickRepo.getByMonth(bm.id),
+      const [monthCommitments, items] = await Promise.all([
+        commitmentRepo.getByMonth(bm.id),
         budgetItemRepo.getByMonth(bm.id),
       ])
-      setBillTicks(ticks)
+      setCommitments(monthCommitments)
       // Reconstruct bank debit total from stored spending progress %
       const planned = totalPlanned(items)
       setBankDebitTotal(planned > 0 ? (existing.spendingProgressPercent / 100) * planned : 0)
@@ -208,10 +208,10 @@ export function CheckInPage() {
       setBudgetMonthId(bm.id)
       const settings = await settingsRepo.get()
 
-      const [items, transactions, ticks, groups, categories] = await Promise.all([
+      const [items, transactions, monthCommitments, groups, categories] = await Promise.all([
         budgetItemRepo.getByMonth(bm.id),
         transactionRepo.getByMonth(bm.id),
-        billTickRepo.getByMonth(bm.id),
+        commitmentRepo.getByMonth(bm.id),
         budgetGroupRepo.getAll(),
         categoryRepo.getActive(),
       ])
@@ -253,7 +253,7 @@ export function CheckInPage() {
         bankTransactions: parsed,
         budgetItems: items,
         transactions,
-        billTicks: ticks,
+        billTicks: [],
         groups: groups.filter((g) => g.isActive),
         categories,
         scenarios: scenarioData.map(({ scenario, expenses, currentVerdict }) => ({
@@ -307,7 +307,7 @@ export function CheckInPage() {
 
       setResult(checkIn)
       setBankDebitTotal(bankDebitSum)
-      setBillTicks(ticks)
+      setCommitments(monthCommitments)
       setPaydayDay(settings.paydayDayOfMonth)
       setPageState('results')
     } catch (err) {
@@ -520,9 +520,8 @@ export function CheckInPage() {
 
   // Compute KPI values
   const planned = totalPlanned(allItems)
-  const billItems = allItems.filter((i) => i.isBill)
-  const unpaidBills = billItems.filter((i) => !billTicks.find((t) => t.budgetItemId === i.id && t.isPaid))
-  const unpaidBillsAmount = unpaidBills.reduce((s, i) => s + effectivePlanned(i), 0)
+  const unpaidCommitments = commitments.filter((commitment) => commitment.status !== 'paid')
+  const unpaidCommitmentsAmount = unpaidCommitments.reduce((sum, commitment) => sum + commitment.amount, 0)
 
   // Days to payday
   const today = new Date()
@@ -559,8 +558,8 @@ export function CheckInPage() {
       <KPISummaryStrip
         spentSoFar={bankDebitTotal}
         budgetRemaining={planned - bankDebitTotal}
-        billsLeftCount={unpaidBills.length}
-        billsLeftAmount={unpaidBillsAmount}
+        commitmentsLeftCount={unpaidCommitments.length}
+        commitmentsLeftAmount={unpaidCommitmentsAmount}
         daysToPayday={daysToPayday}
       />
 

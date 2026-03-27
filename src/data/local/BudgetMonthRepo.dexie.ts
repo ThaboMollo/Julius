@@ -3,6 +3,7 @@ import { db } from './db'
 import type { IBudgetMonthRepo } from '../repositories/BudgetMonthRepo'
 import type { BudgetMonth, CreateBudgetMonth } from '../../domain/models'
 import { activeUserId, forActiveUser, stampNew, stampSoftDelete, stampUpdate } from './scoped'
+import { ensureMonthBootstrap } from './seed'
 
 function generateId(): string {
   return crypto.randomUUID()
@@ -29,10 +30,15 @@ export const budgetMonthRepo: IBudgetMonthRepo = {
     const all = (await this.getAll()).filter((m) => m.monthKey === monthKey)
 
     if (all.length === 0) {
-      return this.create({ year, month, monthKey, expectedIncome: null })
+      const created = await this.create({ year, month, monthKey, expectedIncome: null })
+      await ensureMonthBootstrap(created)
+      return created
     }
 
-    if (all.length === 1) return all[0]
+    if (all.length === 1) {
+      await ensureMonthBootstrap(all[0])
+      return all[0]
+    }
 
     // Multiple months for the same key exist (ghost from a broken migration
     // window). Prefer the one with the most budget items, then oldest createdAt.
@@ -47,6 +53,7 @@ export const budgetMonthRepo: IBudgetMonthRepo = {
     withCounts.sort(
       (a, b) => b.count - a.count || String(a.m.createdAt ?? '').localeCompare(String(b.m.createdAt ?? '')),
     )
+    await ensureMonthBootstrap(withCounts[0].m)
     return withCounts[0].m
   },
 

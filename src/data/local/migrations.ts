@@ -1,10 +1,11 @@
-import { budgetMonthRepo, budgetItemRepo, billTickRepo, transactionRepo } from '.'
+import { budgetMonthRepo, budgetItemRepo, billTickRepo, commitmentRepo, transactionRepo } from '.'
 import { effectivePlanned } from '../../domain/rules'
 
-const MIGRATION_KEY = 'julius_bills_to_transactions_v1'
+const PAID_BILLS_TO_TRANSACTIONS_KEY = 'julius_bills_to_transactions_v1'
+const LEGACY_BILLS_TO_COMMITMENTS_KEY = 'julius_legacy_bills_to_commitments_v1'
 
 export async function migratePaidBillsToTransactions(): Promise<void> {
-  if (localStorage.getItem(MIGRATION_KEY)) return
+  if (localStorage.getItem(PAID_BILLS_TO_TRANSACTIONS_KEY)) return
 
   const months = await budgetMonthRepo.getAll()
 
@@ -31,5 +32,58 @@ export async function migratePaidBillsToTransactions(): Promise<void> {
     }
   }
 
-  localStorage.setItem(MIGRATION_KEY, '1')
+  localStorage.setItem(PAID_BILLS_TO_TRANSACTIONS_KEY, '1')
+}
+
+export async function migrateLegacyBillsToCommitments(): Promise<void> {
+  if (localStorage.getItem(LEGACY_BILLS_TO_COMMITMENTS_KEY)) return
+
+  const months = await budgetMonthRepo.getAll()
+
+  for (const month of months) {
+    const [items, ticks] = await Promise.all([
+      budgetItemRepo.getBillsByMonth(month.id),
+      billTickRepo.getByMonth(month.id),
+    ])
+
+    for (const item of items) {
+      const existingCommitment = await commitmentRepo.getByLegacyBudgetItemId(item.id)
+      if (existingCommitment) {
+        continue
+      }
+
+      const tick = ticks.find((entry) => entry.budgetItemId === item.id)
+      const linkedTransactions = await transactionRepo.getByItem(item.id)
+      const monthTransaction = linkedTransactions.find((tx) => tx.budgetMonthId === month.id)
+
+      const createdCommitment = await commitmentRepo.create({
+        budgetMonthId: month.id,
+        categoryId: item.categoryId,
+        name: item.name,
+        amount: effectivePlanned(item),
+        dueDate: item.dueDate,
+        type: 'bill',
+        status: tick?.isPaid ? 'paid' : 'upcoming',
+        isRecurring: item.isFromTemplate,
+        templateId: item.templateId,
+        paidTransactionId: monthTransaction?.id ?? null,
+        legacyBudgetItemId: item.id,
+        notes: '',
+      })
+
+      if (monthTransaction && !monthTransaction.commitmentId) {
+        await transactionRepo.update(monthTransaction.id, {
+          commitmentId: createdCommitment.id,
+          source: monthTransaction.source ?? 'commitment',
+        })
+      }
+    }
+  }
+
+  localStorage.setItem(LEGACY_BILLS_TO_COMMITMENTS_KEY, '1')
+}
+
+export async function initializeLocalData(): Promise<void> {
+  await migratePaidBillsToTransactions()
+  await migrateLegacyBillsToCommitments()
 }

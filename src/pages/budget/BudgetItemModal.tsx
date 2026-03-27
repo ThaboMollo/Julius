@@ -225,11 +225,11 @@ export function BudgetItemModal({
             </div>
           </div>
 
-          {/* Bill Toggle */}
+          {/* Commitment Toggle */}
           <div className="flex items-center justify-between py-2">
             <div>
-              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This is a bill</label>
-              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Track due date and paid status</p>
+              <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">This creates a commitment</label>
+              <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Track a due date for bills, debts, or subscriptions</p>
             </div>
             <button
               type="button"
@@ -246,7 +246,7 @@ export function BudgetItemModal({
             </button>
           </div>
 
-          {/* Due Day (if bill) */}
+          {/* Due Day (if commitment) */}
           {isBill && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">

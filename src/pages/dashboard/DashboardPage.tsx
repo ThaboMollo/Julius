@@ -1,33 +1,26 @@
 import { useEffect, useState } from 'react'
-import { useMonth } from '../../app/MonthContext'
+import { Link } from 'react-router-dom'
+import { format } from 'date-fns'
 import {
   budgetMonthRepo,
   budgetItemRepo,
   transactionRepo,
   budgetGroupRepo,
   categoryRepo,
-  billTickRepo,
-  settingsRepo,
+  commitmentRepo,
 } from '../../data/local'
-import type {
-  BudgetMonth,
-  BudgetItem,
-  Transaction,
-  BudgetGroup,
-  Category,
-  BillTick,
-  AppSettings,
-} from '../../domain/models'
+import type { BudgetMonth, BudgetItem, Transaction, BudgetGroup, Category, Commitment } from '../../domain/models'
 import {
   totalPlanned,
-  totalActual,
-  remainingUntilPayday,
-  daysUntilPayday,
-  topOverspentCategories,
-  unbudgetedSpending,
-  getGroupSummaries,
+  totalExpenses,
+  totalIncome,
+  safeToSpend,
+  getPotentialSavings,
+  getUpcomingCommitments,
+  getRecentTransactions,
 } from '../../domain/rules'
 import { formatCurrency } from '../../domain/constants'
+import { useMonth } from '../../app/MonthContext'
 
 export function DashboardPage() {
   const { selectedMonth, monthKey } = useMonth()
@@ -37,8 +30,7 @@ export function DashboardPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [groups, setGroups] = useState<BudgetGroup[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [billTicks, setBillTicks] = useState<BillTick[]>([])
-  const [settings, setSettings] = useState<AppSettings | null>(null)
+  const [commitments, setCommitments] = useState<Commitment[]>([])
 
   useEffect(() => {
     loadData()
@@ -50,33 +42,31 @@ export function DashboardPage() {
       const year = selectedMonth.getFullYear()
       const month = selectedMonth.getMonth() + 1
 
-      const [bm, grps, cats, sets] = await Promise.all([
+      const [bm, grps, cats] = await Promise.all([
         budgetMonthRepo.getOrCreate(year, month),
         budgetGroupRepo.getActive(),
         categoryRepo.getActive(),
-        settingsRepo.get(),
       ])
 
       setBudgetMonth(bm)
       setGroups(grps)
       setCategories(cats)
-      setSettings(sets)
 
-      const [itms, txs, ticks] = await Promise.all([
+      const [itms, txs, cmts] = await Promise.all([
         budgetItemRepo.getByMonth(bm.id),
         transactionRepo.getByMonth(bm.id),
-        billTickRepo.getByMonth(bm.id),
+        commitmentRepo.getByMonth(bm.id),
       ])
 
       setItems(itms)
       setTransactions(txs)
-      setBillTicks(ticks)
+      setCommitments(cmts)
     } finally {
       setLoading(false)
     }
   }
 
-  if (loading || !settings) {
+  if (loading || !budgetMonth) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
@@ -84,148 +74,166 @@ export function DashboardPage() {
     )
   }
 
-  const planned = totalPlanned(items)
-  const spent = totalActual(transactions)
-  const remaining = remainingUntilPayday(
-    items,
-    transactions,
-    budgetMonth?.expectedIncome ?? settings.expectedMonthlyIncome
-  )
-  const daysToPayday = daysUntilPayday(
-    selectedMonth.getFullYear(),
-    selectedMonth.getMonth() + 1,
-    settings.paydayDayOfMonth
-  )
-  const overspentCategories = topOverspentCategories(items, transactions, categories, 5)
-  const unbudgeted = unbudgetedSpending(transactions)
-  const groupSummaries = getGroupSummaries(groups, items, transactions)
-
-  const unpaidBills = items.filter((item) => {
-    if (!item.isBill) return false
-    const tick = billTicks.find((t) => t.budgetItemId === item.id)
-    return !tick?.isPaid
-  })
+  const spendable = safeToSpend(items, transactions, commitments, categories, groups)
+  const income = totalIncome(transactions)
+  const expenses = totalExpenses(transactions)
+  const plannedSavings = (() => {
+    const savingsGroup = groups.find((group) => group.name === 'Savings')
+    return savingsGroup ? totalPlanned(items.filter((item) => item.groupId === savingsGroup.id)) : 0
+  })()
+  const potentialSavings = getPotentialSavings(transactions, categories, items, 3)
+  const upcomingCommitments = getUpcomingCommitments(commitments, 4)
+  const recentTransactions = getRecentTransactions(transactions, 5)
+  const hasAnyTransactions = transactions.length > 0
 
   return (
     <div className="p-4 space-y-4">
-      {/* Main KPI Card */}
-      <div
-        className="rounded-xl p-5 shadow-lg"
-        style={{ background: 'linear-gradient(135deg, #3B4A2F 0%, #5A6B3F 100%)' }}
-      >
+      <div className="rounded-xl p-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #3B4A2F 0%, #5A6B3F 100%)' }}>
         <div className="text-sm mb-1" style={{ color: '#C4A86B', opacity: 0.9 }}>
-          Remaining until payday
+          Safe to spend
         </div>
-        <div className="text-3xl font-bold mb-3" style={{ color: '#C4A86B' }}>
-          {formatCurrency(remaining)}
+        <div className={`text-3xl font-bold mb-3 ${spendable < 0 ? 'text-red-200' : ''}`} style={{ color: spendable < 0 ? undefined : '#C4A86B' }}>
+          {formatCurrency(spendable)}
         </div>
         <div className="flex justify-between text-sm text-white opacity-80">
-          <span>{daysToPayday} days to payday</span>
-          <span>{unpaidBills.length} bills unpaid</span>
+          <span>{income > 0 ? `${formatCurrency(income)} income logged` : 'No income recorded yet'}</span>
+          <span>{upcomingCommitments.length} commitments coming up</span>
         </div>
       </div>
 
-      {/* Budget Overview */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-        <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-[#F0EDE4]">Budget Overview</h2>
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-[#8A9BAA]">Planned</span>
-            <span className="font-medium">{formatCurrency(planned)}</span>
+      <div className="grid grid-cols-2 gap-3">
+        <Link
+          to="/transactions"
+          className="bg-[#A89060] hover:bg-[#8B7550] text-white rounded-xl p-4 shadow"
+        >
+          <div className="text-sm opacity-80">Primary action</div>
+          <div className="text-lg font-semibold mt-1">+ Add Expense</div>
+        </Link>
+        <Link
+          to="/transactions"
+          className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow hover:bg-gray-50 dark:hover:bg-[#2E3A4E]"
+        >
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Need income?</div>
+          <div className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mt-1">
+            {income > 0 ? 'Add another income' : 'Add income'}
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-600 dark:text-[#8A9BAA]">Spent</span>
-            <span className="font-medium text-red-600">{formatCurrency(spent)}</span>
-          </div>
-          <div className="flex justify-between border-t dark:border-[#2E3A4E] pt-2">
-            <span className="text-gray-600 dark:text-[#8A9BAA]">Remaining Budget</span>
-            <span className={`font-medium ${planned - spent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCurrency(planned - spent)}
-            </span>
-          </div>
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Income</div>
+          <div className="text-xl font-bold text-green-600">{formatCurrency(income)}</div>
+        </div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Expenses</div>
+          <div className="text-xl font-bold text-red-600">{formatCurrency(expenses)}</div>
+        </div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Savings target</div>
+          <div className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(plannedSavings)}</div>
         </div>
       </div>
 
-      {/* Group Summaries */}
+      {!hasAnyTransactions && (
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">Start here</h2>
+          <p className="text-sm text-gray-600 dark:text-[#8A9BAA] mb-4">
+            Your month is ready. Record income first, then add expenses as they happen. You do not need to set up a budget before using the app.
+          </p>
+          <div className="flex gap-2">
+            <Link to="/transactions" className="px-4 py-2 bg-[#3B7A57] text-white rounded-lg hover:bg-[#2F6548]">
+              Add income
+            </Link>
+            <Link to="/transactions" className="px-4 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]">
+              Add expense
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-        <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-[#F0EDE4]">By Group</h2>
-        {groupSummaries.length === 0 ? (
-          <p className="text-gray-500 dark:text-[#8A9BAA] text-sm">No budget items yet</p>
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Potential savings</h2>
+          <Link to="/transactions" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
+            Review
+          </Link>
+        </div>
+        {potentialSavings.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">Not enough activity yet to suggest anything.</p>
         ) : (
           <div className="space-y-3">
-            {groupSummaries.map(({ group, planned, actual, overspend }) => (
-              <div key={group.id} className="border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-800 dark:text-[#F0EDE4]">{group.name}</span>
-                  <span className={overspend > 0 ? 'text-red-600' : 'text-gray-600 dark:text-[#8A9BAA]'}>
-                    {formatCurrency(actual)} / {formatCurrency(planned)}
-                  </span>
+            {potentialSavings.map((item) => (
+              <div key={`${item.label}-${item.reason}`} className="flex justify-between items-start border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
+                <div>
+                  <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{item.label}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">{item.reason}</div>
                 </div>
-                {overspend > 0 && (
-                  <div className="text-xs text-red-500 mt-0.5">
-                    Over by {formatCurrency(overspend)}
-                  </div>
-                )}
-                <div className="mt-1 bg-gray-200 dark:bg-[#2E3A4E] rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full ${
-                      actual > planned ? 'bg-red-500' : 'bg-[#A89060] dark:bg-[#C4A86B]'
-                    }`}
-                    style={{ width: `${Math.min(100, (actual / planned) * 100 || 0)}%` }}
-                  />
-                </div>
+                <div className="text-[#8B7550] dark:text-[#C4A86B] font-medium">{formatCurrency(item.amount)}</div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Leaks Section */}
-      {(overspentCategories.length > 0 || unbudgeted > 0) && (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-          <h2 className="text-lg font-semibold mb-3 text-red-600">Money Leaks</h2>
-
-          {unbudgeted > 0 && (
-            <div className="mb-3 p-3 bg-red-50 dark:bg-red-950/30 rounded-lg">
-              <div className="flex justify-between items-center">
-                <span className="text-red-700 font-medium">Unbudgeted Spending</span>
-                <span className="text-red-700 font-bold">{formatCurrency(unbudgeted)}</span>
-              </div>
-              <p className="text-xs text-red-600 mt-1">
-                Transactions without a budget item
-              </p>
-            </div>
-          )}
-
-          {overspentCategories.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-[#8A9BAA]">Top Overspent Categories</h3>
-              {overspentCategories.map(({ category, overspend, planned, actual }) => (
-                <div key={category.id} className="flex justify-between items-center py-1 border-b dark:border-[#2E3A4E] last:border-0">
-                  <div>
-                    <span className="text-gray-800 dark:text-[#F0EDE4]">{category.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-[#8A9BAA] ml-2">
-                      {formatCurrency(actual)} / {formatCurrency(planned)}
-                    </span>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Upcoming commitments</h2>
+          <Link to="/commitments" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
+            Open list
+          </Link>
+        </div>
+        {upcomingCommitments.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">No upcoming commitments yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {upcomingCommitments.map((commitment) => (
+              <div key={commitment.id} className="flex justify-between items-center border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
+                <div>
+                  <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{commitment.name}</div>
+                  <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">
+                    {commitment.dueDate ? `Due ${format(new Date(commitment.dueDate), 'd MMM')}` : 'No due date'}
                   </div>
-                  <span className="text-red-600 font-medium">+{formatCurrency(overspend)}</span>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+                <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(commitment.amount)}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Empty State */}
-      {items.length === 0 && transactions.length === 0 && (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
-          <div className="text-4xl mb-3">🚀</div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">Get Started!</h3>
-          <p className="text-gray-600 dark:text-[#8A9BAA] text-sm">
-            Add budget items on the Budget page to start tracking your spending.
-          </p>
+      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+        <div className="flex justify-between items-center mb-3">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Recent transactions</h2>
+          <Link to="/transactions" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
+            View all
+          </Link>
         </div>
-      )}
+        {recentTransactions.length === 0 ? (
+          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">No transactions recorded yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentTransactions.map((tx) => {
+              const category = categories.find((entry) => entry.id === tx.categoryId)
+              const label = tx.merchant || tx.note || category?.name || 'Unknown'
+              return (
+                <div key={tx.id} className="flex justify-between items-center border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
+                  <div>
+                    <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{label}</div>
+                    <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">
+                      {format(new Date(tx.date), 'd MMM')} · {category?.name || 'No category'}
+                    </div>
+                  </div>
+                  <div className={tx.kind === 'income' ? 'text-green-600 font-medium' : 'text-gray-800 dark:text-[#F0EDE4] font-medium'}>
+                    {tx.kind === 'income' ? '+' : '-'}
+                    {formatCurrency(tx.amount)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

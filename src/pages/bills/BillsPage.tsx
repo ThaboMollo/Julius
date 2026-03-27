@@ -1,54 +1,32 @@
 import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import { useMonth } from '../../app/MonthContext'
-import {
-  budgetMonthRepo,
-  budgetItemRepo,
-  billTickRepo,
-  budgetGroupRepo,
-  categoryRepo,
-  settingsRepo,
-  transactionRepo,
-} from '../../data/local'
-import type {
-  BudgetMonth,
-  BudgetItem,
-  BillTick,
-  BudgetGroup,
-  Category,
-  AppSettings,
-  CreateTransaction,
-} from '../../domain/models'
-import { effectivePlanned, getBillDueStatus, type BillDueStatus } from '../../domain/rules'
+import { budgetMonthRepo, commitmentRepo, categoryRepo, transactionRepo } from '../../data/local'
+import type { BudgetMonth, Commitment, Category, CreateTransaction } from '../../domain/models'
+import { getCommitmentStatus, type BillDueStatus, getUpcomingCommitments } from '../../domain/rules'
 import { formatCurrency } from '../../domain/constants'
 import { TransactionModal } from '../transactions/TransactionModal'
 
-type FilterType = 'all' | 'overdue' | 'due_today' | 'due_tomorrow' | 'due_before_payday' | 'unpaid' | 'paid'
+type FilterType = 'all' | 'overdue' | 'due_today' | 'due_tomorrow' | 'upcoming' | 'unpaid' | 'paid'
 
 const STATUS_BADGES: Record<BillDueStatus, { label: string; className: string }> = {
   overdue: { label: 'Overdue', className: 'bg-red-100 text-red-700' },
   due_today: { label: 'Due Today', className: 'bg-orange-100 text-orange-700' },
   due_tomorrow: { label: 'Tomorrow', className: 'bg-yellow-100 text-yellow-700' },
-  due_before_payday: {
-    label: 'Before Payday',
-    className: 'bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B]',
-  },
+  due_before_payday: { label: 'Soon', className: 'bg-[#F5F0E8] text-[#8B7550] dark:bg-[#2A2215] dark:text-[#C4A86B]' },
   upcoming: { label: 'Upcoming', className: 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA]' },
   paid: { label: 'Paid', className: 'bg-green-100 text-green-700' },
 }
 
-export function BillsPage() {
+export function CommitmentsPage() {
   const { selectedMonth, monthKey } = useMonth()
   const [loading, setLoading] = useState(true)
   const [budgetMonth, setBudgetMonth] = useState<BudgetMonth | null>(null)
-  const [bills, setBills] = useState<BudgetItem[]>([])
-  const [billTicks, setBillTicks] = useState<BillTick[]>([])
-  const [groups, setGroups] = useState<BudgetGroup[]>([])
+  const [commitments, setCommitments] = useState<Commitment[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [settings, setSettings] = useState<AppSettings | null>(null)
   const [filter, setFilter] = useState<FilterType>('all')
-  const [billModalOpen, setBillModalOpen] = useState(false)
-  const [pendingPayBill, setPendingPayBill] = useState<BudgetItem | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [pendingCommitment, setPendingCommitment] = useState<Commitment | null>(null)
 
   useEffect(() => {
     loadData()
@@ -60,72 +38,74 @@ export function BillsPage() {
       const year = selectedMonth.getFullYear()
       const month = selectedMonth.getMonth() + 1
 
-      const [bm, grps, cats, sets] = await Promise.all([
-        budgetMonthRepo.getOrCreate(year, month),
-        budgetGroupRepo.getActive(),
-        categoryRepo.getActive(),
-        settingsRepo.get(),
-      ])
-
+      const [bm, cats] = await Promise.all([budgetMonthRepo.getOrCreate(year, month), categoryRepo.getActive()])
       setBudgetMonth(bm)
-      setGroups(grps)
       setCategories(cats)
-      setSettings(sets)
-
-      const [billItems, ticks] = await Promise.all([
-        budgetItemRepo.getBillsByMonth(bm.id),
-        billTickRepo.getByMonth(bm.id),
-      ])
-
-      setBills(billItems)
-      setBillTicks(ticks)
+      setCommitments(await commitmentRepo.getByMonth(bm.id))
     } finally {
       setLoading(false)
     }
   }
 
-  async function togglePaid(bill: BudgetItem) {
+  async function togglePaid(commitment: Commitment) {
     if (!budgetMonth) return
-    const currentTick = billTicks.find((t) => t.budgetItemId === bill.id)
-    if (currentTick?.isPaid) {
-      const linked = await transactionRepo.getByItem(bill.id)
-      const txForMonth = linked.find((tx) => tx.budgetMonthId === budgetMonth.id)
-      if (txForMonth) {
-        const deleteIt = window.confirm(`Also delete the transaction for "${bill.name}"?`)
-        if (deleteIt) await transactionRepo.delete(txForMonth.id)
+
+    if (commitment.status === 'paid') {
+      if (commitment.paidTransactionId) {
+        const linkedTx = await transactionRepo.getById(commitment.paidTransactionId)
+        if (linkedTx) {
+          const deleteIt = window.confirm(`Also delete the transaction for "${commitment.name}"?`)
+          if (deleteIt) {
+            await transactionRepo.delete(linkedTx.id)
+          }
+        }
       }
-      await billTickRepo.togglePaid(budgetMonth.id, bill.id)
-      setBillTicks(await billTickRepo.getByMonth(budgetMonth.id))
-    } else {
-      setPendingPayBill(bill)
-      setBillModalOpen(true)
+
+      await commitmentRepo.update(commitment.id, {
+        status: 'upcoming',
+        paidTransactionId: null,
+      })
+      await loadData()
+      return
     }
+
+    setPendingCommitment(commitment)
+    setModalOpen(true)
   }
 
-  async function handleBillTransactionSave(data: CreateTransaction) {
-    if (!pendingPayBill || !budgetMonth) return
-    await transactionRepo.create(data)
-    await billTickRepo.togglePaid(budgetMonth.id, pendingPayBill.id)
-    setBillTicks(await billTickRepo.getByMonth(budgetMonth.id))
-    setBillModalOpen(false)
-    setPendingPayBill(null)
+  async function handleCommitmentTransactionSave(data: CreateTransaction) {
+    if (!pendingCommitment) return
+
+    const existingLinked = pendingCommitment.paidTransactionId
+      ? await transactionRepo.getById(pendingCommitment.paidTransactionId)
+      : null
+
+    const savedTx = existingLinked
+      ? (await transactionRepo.update(existingLinked.id, data), existingLinked)
+      : await transactionRepo.create({
+          ...data,
+          kind: 'expense',
+          source: 'commitment',
+          commitmentId: pendingCommitment.id,
+        })
+
+    await commitmentRepo.update(pendingCommitment.id, {
+      status: 'paid',
+      paidTransactionId: savedTx.id,
+    })
+
+    setModalOpen(false)
+    setPendingCommitment(null)
+    await loadData()
   }
 
-  function getBillStatus(item: BudgetItem): BillDueStatus {
-    if (!settings) return 'upcoming'
-    const tick = billTicks.find((t) => t.budgetItemId === item.id)
-    return getBillDueStatus(
-      item,
-      tick,
-      selectedMonth.getFullYear(),
-      selectedMonth.getMonth() + 1,
-      settings.paydayDayOfMonth
-    )
+  function getStatus(commitment: Commitment): BillDueStatus {
+    return getCommitmentStatus(commitment)
   }
 
-  function getFilteredBills(): BudgetItem[] {
-    return bills
-      .map((bill) => ({ bill, status: getBillStatus(bill) }))
+  function getFilteredCommitments(): Commitment[] {
+    return commitments
+      .map((commitment) => ({ commitment, status: getStatus(commitment) }))
       .filter(({ status }) => {
         switch (filter) {
           case 'overdue':
@@ -134,8 +114,8 @@ export function BillsPage() {
             return status === 'due_today'
           case 'due_tomorrow':
             return status === 'due_tomorrow'
-          case 'due_before_payday':
-            return status === 'due_before_payday'
+          case 'upcoming':
+            return status === 'upcoming' || status === 'due_before_payday'
           case 'unpaid':
             return status !== 'paid'
           case 'paid':
@@ -145,15 +125,14 @@ export function BillsPage() {
         }
       })
       .sort((a, b) => {
-        // Sort by due date, then by status priority
-        const dateA = a.bill.dueDate ? new Date(a.bill.dueDate).getTime() : Infinity
-        const dateB = b.bill.dueDate ? new Date(b.bill.dueDate).getTime() : Infinity
+        const dateA = a.commitment.dueDate ? new Date(a.commitment.dueDate).getTime() : Infinity
+        const dateB = b.commitment.dueDate ? new Date(b.commitment.dueDate).getTime() : Infinity
         return dateA - dateB
       })
-      .map(({ bill }) => bill)
+      .map(({ commitment }) => commitment)
   }
 
-  if (loading || !settings) {
+  if (loading || !budgetMonth) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
@@ -161,106 +140,98 @@ export function BillsPage() {
     )
   }
 
-  const filteredBills = getFilteredBills()
-  const billInitialValues: Partial<CreateTransaction> | undefined = pendingPayBill
+  const filteredCommitments = getFilteredCommitments()
+  const unpaidCommitments = commitments.filter((commitment) => commitment.status !== 'paid')
+  const paidCommitments = commitments.filter((commitment) => commitment.status === 'paid')
+  const unpaidTotal = unpaidCommitments.reduce((sum, commitment) => sum + commitment.amount, 0)
+  const paidTotal = paidCommitments.reduce((sum, commitment) => sum + commitment.amount, 0)
+  const upcoming = getUpcomingCommitments(commitments, commitments.length)
+  const modalInitialValues: Partial<CreateTransaction> | undefined = pendingCommitment
     ? {
-        budgetMonthId: budgetMonth?.id ?? '',
-        categoryId: pendingPayBill.categoryId,
-        budgetItemId: pendingPayBill.id,
-        amount: effectivePlanned(pendingPayBill),
-        date: pendingPayBill.dueDate ?? new Date(),
-        note: pendingPayBill.name,
+        budgetMonthId: budgetMonth.id,
+        categoryId: pendingCommitment.categoryId,
+        amount: pendingCommitment.amount,
+        date: pendingCommitment.dueDate ?? new Date(),
+        note: pendingCommitment.name,
+        merchant: pendingCommitment.name,
+        kind: 'expense',
+        source: 'commitment',
+        commitmentId: pendingCommitment.id,
       }
     : undefined
-  const unpaidTotal = bills
-    .filter((b) => !billTicks.find((t) => t.budgetItemId === b.id)?.isPaid)
-    .reduce((sum, b) => sum + effectivePlanned(b), 0)
-  const paidTotal = bills
-    .filter((b) => billTicks.find((t) => t.budgetItemId === b.id)?.isPaid)
-    .reduce((sum, b) => sum + effectivePlanned(b), 0)
 
   return (
     <div className="p-4 space-y-4">
-      {/* Summary */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-3">
         <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Unpaid</div>
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Outstanding</div>
           <div className="text-xl font-bold text-red-600">{formatCurrency(unpaidTotal)}</div>
-          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
-            {bills.filter((b) => !billTicks.find((t) => t.budgetItemId === b.id)?.isPaid).length} bills
-          </div>
+          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">{unpaidCommitments.length} commitments</div>
         </div>
         <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
           <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Paid</div>
           <div className="text-xl font-bold text-green-600">{formatCurrency(paidTotal)}</div>
-          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">
-            {bills.filter((b) => billTicks.find((t) => t.budgetItemId === b.id)?.isPaid).length} bills
-          </div>
+          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">{paidCommitments.length} commitments</div>
+        </div>
+        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
+          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Upcoming</div>
+          <div className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">{upcoming.length}</div>
+          <div className="text-xs text-gray-400 dark:text-[#8A9BAA]">Need attention</div>
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2">
-        {(['all', 'unpaid', 'overdue', 'due_today', 'due_tomorrow', 'due_before_payday', 'paid'] as FilterType[]).map(
-          (f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
-                filter === f
-                  ? 'bg-[#A89060] dark:bg-[#C4A86B] text-white'
-                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-200 dark:hover:bg-[#2E3A4E]'
-              }`}
-            >
-              {f === 'all'
-                ? 'All'
-                : f === 'unpaid'
-                ? 'Unpaid'
-                : f === 'overdue'
-                ? 'Overdue'
-                : f === 'due_today'
-                ? 'Due Today'
-                : f === 'due_tomorrow'
-                ? 'Tomorrow'
-                : f === 'due_before_payday'
-                ? 'Before Payday'
-                : 'Paid'}
-            </button>
-          )
-        )}
+        {(['all', 'unpaid', 'overdue', 'due_today', 'due_tomorrow', 'upcoming', 'paid'] as FilterType[]).map((value) => (
+          <button
+            key={value}
+            onClick={() => setFilter(value)}
+            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
+              filter === value
+                ? 'bg-[#A89060] dark:bg-[#C4A86B] text-white'
+                : 'bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-200 dark:hover:bg-[#2E3A4E]'
+            }`}
+          >
+            {value === 'all'
+              ? 'All'
+              : value === 'unpaid'
+                ? 'Outstanding'
+                : value === 'due_today'
+                  ? 'Due Today'
+                  : value === 'due_tomorrow'
+                    ? 'Tomorrow'
+                    : value === 'upcoming'
+                      ? 'Upcoming'
+                      : value === 'paid'
+                        ? 'Paid'
+                        : 'Overdue'}
+          </button>
+        ))}
       </div>
 
-      {/* Bills List */}
-      {bills.length === 0 ? (
+      {commitments.length === 0 ? (
         <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
           <div className="text-4xl mb-3">📋</div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">No Bills</h3>
+          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">No Commitments</h3>
           <p className="text-gray-600 dark:text-[#8A9BAA] text-sm">
-            Mark budget items as bills on the Budget page to see them here.
+            Bills, debts, and subscriptions will appear here once they are created.
           </p>
         </div>
-      ) : filteredBills.length === 0 ? (
+      ) : filteredCommitments.length === 0 ? (
         <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
-          <p className="text-gray-500 dark:text-[#8A9BAA]">No bills match the current filter</p>
+          <p className="text-gray-500 dark:text-[#8A9BAA]">No commitments match the current filter</p>
         </div>
       ) : (
         <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow divide-y dark:divide-[#2E3A4E]">
-          {filteredBills.map((bill) => {
-            const tick = billTicks.find((t) => t.budgetItemId === bill.id)
-            const isPaid = tick?.isPaid || false
-            const status = getBillStatus(bill)
-            const group = groups.find((g) => g.id === bill.groupId)
-            const category = categories.find((c) => c.id === bill.categoryId)
+          {filteredCommitments.map((commitment) => {
+            const isPaid = commitment.status === 'paid'
+            const status = getStatus(commitment)
+            const category = categories.find((entry) => entry.id === commitment.categoryId)
             const badge = STATUS_BADGES[status]
 
             return (
-              <div
-                key={bill.id}
-                className={`p-4 flex items-center gap-3 ${isPaid ? 'bg-gray-50 dark:bg-[#1E2330]' : ''}`}
-              >
-                {/* Checkbox */}
+              <div key={commitment.id} className={`p-4 flex items-center gap-3 ${isPaid ? 'bg-gray-50 dark:bg-[#1E2330]' : ''}`}>
                 <button
-                  onClick={() => togglePaid(bill)}
+                  onClick={() => void togglePaid(commitment)}
                   className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                     isPaid
                       ? 'bg-green-500 border-green-500 text-white'
@@ -270,49 +241,41 @@ export function BillsPage() {
                   {isPaid && '✓'}
                 </button>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span
-                      className={`font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA] line-through' : 'text-gray-800 dark:text-[#F0EDE4]'}`}
-                    >
-                      {bill.name}
+                    <span className={`font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA] line-through' : 'text-gray-800 dark:text-[#F0EDE4]'}`}>
+                      {commitment.name}
                     </span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${badge.className}`}>
-                      {badge.label}
-                    </span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${badge.className}`}>{badge.label}</span>
                   </div>
                   <div className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">
-                    {group?.name} · {category?.name}
-                    {bill.dueDate && (
-                      <span className="ml-2">
-                        Due: {format(new Date(bill.dueDate), 'd MMM')}
-                      </span>
-                    )}
+                    {category?.name || commitment.type}
+                    {commitment.dueDate && <span className="ml-2">Due: {format(new Date(commitment.dueDate), 'd MMM')}</span>}
                   </div>
                 </div>
 
-                {/* Amount */}
-                <div
-                  className={`text-right font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA]' : 'text-gray-800 dark:text-[#F0EDE4]'}`}
-                >
-                  {formatCurrency(effectivePlanned(bill))}
+                <div className={`text-right font-medium ${isPaid ? 'text-gray-400 dark:text-[#8A9BAA]' : 'text-gray-800 dark:text-[#F0EDE4]'}`}>
+                  {formatCurrency(commitment.amount)}
                 </div>
               </div>
             )
           })}
         </div>
       )}
+
       <TransactionModal
-        key={pendingPayBill?.id}
-        isOpen={billModalOpen}
-        onClose={() => { setBillModalOpen(false); setPendingPayBill(null) }}
-        onSave={handleBillTransactionSave}
+        key={pendingCommitment?.id}
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false)
+          setPendingCommitment(null)
+        }}
+        onSave={handleCommitmentTransactionSave}
         transaction={null}
-        initialValues={billInitialValues}
+        initialValues={modalInitialValues}
         categories={categories}
-        items={bills}
-        budgetMonthId={budgetMonth?.id ?? ''}
+        items={[]}
+        budgetMonthId={budgetMonth.id}
       />
     </div>
   )

@@ -16,12 +16,24 @@ export const transactionRepo: ITransactionRepo = {
     return (await this.getAll()).filter((tx) => tx.budgetMonthId === budgetMonthId)
   },
 
+  async getIncomeByMonth(budgetMonthId: string): Promise<Transaction[]> {
+    return (await this.getByMonth(budgetMonthId)).filter((tx) => tx.kind === 'income')
+  },
+
   async getByCategory(categoryId: string): Promise<Transaction[]> {
     return (await this.getAll()).filter((tx) => tx.categoryId === categoryId)
   },
 
+  async getByCommitment(commitmentId: string): Promise<Transaction[]> {
+    return (await this.getAll()).filter((tx) => tx.commitmentId === commitmentId)
+  },
+
   async getByItem(budgetItemId: string): Promise<Transaction[]> {
     return (await this.getAll()).filter((tx) => tx.budgetItemId === budgetItemId)
+  },
+
+  async getRecurringCandidates(): Promise<Transaction[]> {
+    return (await this.getAll()).filter((tx) => tx.kind === 'expense' && tx.amount > 0)
   },
 
   async getByDateRange(startDate: Date, endDate: Date): Promise<Transaction[]> {
@@ -43,6 +55,10 @@ export const transactionRepo: ITransactionRepo = {
     const newTransaction: Transaction = {
       ...stampNew(transaction),
       id: generateId(),
+      commitmentId: transaction.commitmentId ?? null,
+      kind: transaction.kind ?? 'expense',
+      source: transaction.source ?? 'manual',
+      merchant: transaction.merchant?.trim() ?? '',
     }
     await db.transactions.add(newTransaction)
     return newTransaction

@@ -5,6 +5,7 @@ import type {
   Category,
   BudgetItem,
   CreateTransaction,
+  TransactionKind,
 } from '../../domain/models'
 
 interface Props {
@@ -19,6 +20,10 @@ interface Props {
   budgetMonthId: string
 }
 
+function isIncomeCategory(category: Category | undefined): boolean {
+  return category?.name === 'Income'
+}
+
 export function TransactionModal({
   isOpen,
   onClose,
@@ -31,39 +36,70 @@ export function TransactionModal({
   budgetMonthId,
 }: Props) {
   const seed = transaction ?? initialValues
+  const [kind, setKind] = useState<TransactionKind>(seed?.kind ?? transaction?.kind ?? 'expense')
   const [amount, setAmount] = useState(seed?.amount?.toString() ?? '')
   const [date, setDate] = useState(
-    seed?.date
-      ? format(new Date(seed.date), 'yyyy-MM-dd')
-      : format(new Date(), 'yyyy-MM-dd')
+    seed?.date ? format(new Date(seed.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
   )
   const [categoryId, setCategoryId] = useState(seed?.categoryId ?? '')
   const [budgetItemId, setBudgetItemId] = useState(seed?.budgetItemId ?? '')
+  const [merchant, setMerchant] = useState(seed?.merchant ?? transaction?.merchant ?? '')
   const [note, setNote] = useState(seed?.note ?? '')
 
   useEffect(() => {
     if (transaction) {
+      setKind(transaction.kind)
       setAmount(transaction.amount.toString())
       setDate(format(new Date(transaction.date), 'yyyy-MM-dd'))
       setCategoryId(transaction.categoryId)
       setBudgetItemId(transaction.budgetItemId || '')
+      setMerchant(transaction.merchant)
       setNote(transaction.note)
+      return
     }
-  }, [transaction])
 
-  // Get items for selected category
-  const categoryItems = items.filter((i) => i.categoryId === categoryId)
+    if (initialValues) {
+      setKind(initialValues.kind ?? 'expense')
+      setAmount(initialValues.amount?.toString() ?? '')
+      setDate(initialValues.date ? format(new Date(initialValues.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
+      setCategoryId(initialValues.categoryId ?? '')
+      setBudgetItemId(initialValues.budgetItemId ?? '')
+      setMerchant(initialValues.merchant ?? '')
+      setNote(initialValues.note ?? '')
+    }
+  }, [initialValues, transaction])
 
-  // Auto-select item if only one exists for category
+  const availableCategories = categories.filter((category) => {
+    if (kind === 'income') return isIncomeCategory(category)
+    return !isIncomeCategory(category)
+  })
+
   useEffect(() => {
+    if (!categoryId) {
+      const defaultCategory =
+        availableCategories.find((category) => isIncomeCategory(category) === (kind === 'income')) ??
+        availableCategories[0]
+      if (defaultCategory) {
+        setCategoryId(defaultCategory.id)
+      }
+    }
+  }, [availableCategories, categoryId, kind])
+
+  const categoryItems = kind === 'expense' ? items.filter((i) => i.categoryId === categoryId) : []
+
+  useEffect(() => {
+    if (kind === 'income') {
+      setBudgetItemId('')
+      return
+    }
+
     if (categoryItems.length === 1 && !budgetItemId) {
       setBudgetItemId(categoryItems[0].id)
     }
-    // Clear item selection if category changes and item isn't in new category
     if (budgetItemId && !categoryItems.find((i) => i.id === budgetItemId)) {
       setBudgetItemId('')
     }
-  }, [categoryId, categoryItems])
+  }, [budgetItemId, categoryItems, kind])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -75,7 +111,7 @@ export function TransactionModal({
     }
 
     if (!categoryId) {
-      alert('Please select a category')
+      alert(`Please select a ${kind === 'income' ? 'destination' : 'category'}`)
       return
     }
 
@@ -84,10 +120,9 @@ export function TransactionModal({
       return
     }
 
-    // Warn if category has items but none selected
-    if (categoryItems.length > 0 && !budgetItemId) {
+    if (kind === 'expense' && categoryItems.length > 0 && !budgetItemId) {
       const proceed = confirm(
-        'This category has budget items, but you haven\'t selected one. This will be marked as unbudgeted spending. Continue?'
+        'This category has budget items, but you have not selected one. This will be marked as unbudgeted spending. Continue?',
       )
       if (!proceed) return
     }
@@ -95,10 +130,14 @@ export function TransactionModal({
     onSave({
       budgetMonthId,
       categoryId,
-      budgetItemId: budgetItemId || null,
+      budgetItemId: kind === 'income' ? null : budgetItemId || null,
       amount: parsedAmount,
       date: new Date(date),
+      merchant: merchant.trim(),
       note: note.trim(),
+      kind,
+      source: transaction?.source ?? initialValues?.source ?? 'manual',
+      commitmentId: transaction?.commitmentId ?? initialValues?.commitmentId ?? null,
     })
   }
 
@@ -109,15 +148,42 @@ export function TransactionModal({
       <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
         <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
           <h2 className="text-lg font-semibold dark:text-[#F0EDE4]">
-            {transaction ? 'Edit Transaction' : 'Add Transaction'}
+            {transaction ? 'Edit Transaction' : kind === 'income' ? 'Add Income' : 'Add Expense'}
           </h2>
-          <button onClick={onClose} className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl">
+          <button
+            onClick={onClose}
+            className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl"
+          >
             ×
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Amount */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setKind('expense')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                kind === 'expense'
+                  ? 'bg-[#A89060] text-white'
+                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-700 dark:text-[#F0EDE4]'
+              }`}
+            >
+              Expense
+            </button>
+            <button
+              type="button"
+              onClick={() => setKind('income')}
+              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+                kind === 'income'
+                  ? 'bg-[#3B7A57] text-white'
+                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-700 dark:text-[#F0EDE4]'
+              }`}
+            >
+              Income
+            </button>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
               Amount (ZAR) *
@@ -135,7 +201,6 @@ export function TransactionModal({
             />
           </div>
 
-          {/* Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Date *</label>
             <input
@@ -147,17 +212,18 @@ export function TransactionModal({
             />
           </div>
 
-          {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Category *</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+              {kind === 'income' ? 'Destination *' : 'Category *'}
+            </label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
               required
             >
-              <option value="">Select a category</option>
-              {categories.map((c) => (
+              <option value="">{kind === 'income' ? 'Select destination' : 'Select a category'}</option>
+              {availableCategories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -165,15 +231,9 @@ export function TransactionModal({
             </select>
           </div>
 
-          {/* Budget Item (if category has items) */}
-          {categoryItems.length > 0 && (
+          {kind === 'expense' && categoryItems.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
-                Budget Item
-                {categoryItems.length > 0 && (
-                  <span className="text-[#A89060] dark:text-[#C4A86B] ml-1">*</span>
-                )}
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Budget Item</label>
               <select
                 value={budgetItemId}
                 onChange={(e) => setBudgetItemId(e.target.value)}
@@ -186,34 +246,36 @@ export function TransactionModal({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
-                Link this transaction to a budget item for better tracking.
-              </p>
             </div>
           )}
 
-          {/* Note */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
-              Note (optional)
+              {kind === 'income' ? 'From (optional)' : 'Merchant / Payee'}
             </label>
+            <input
+              type="text"
+              value={merchant}
+              onChange={(e) => setMerchant(e.target.value)}
+              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+              placeholder={kind === 'income' ? 'e.g. Salary' : 'e.g. Woolworths'}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Note (optional)</label>
             <input
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
-              placeholder="e.g., Woolworths groceries"
+              placeholder={kind === 'income' ? 'e.g. March salary' : 'e.g. Family dinner'}
             />
           </div>
 
-          {/* Actions */}
           <div className="flex gap-3 pt-4">
             {onDelete && (
-              <button
-                type="button"
-                onClick={onDelete}
-                className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-              >
+              <button type="button" onClick={onDelete} className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg">
                 Delete
               </button>
             )}
@@ -227,7 +289,7 @@ export function TransactionModal({
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-[#A89060] hover:bg-[#8B7550] text-white rounded-lg"
+              className={`px-6 py-2 text-white rounded-lg ${kind === 'income' ? 'bg-[#3B7A57] hover:bg-[#2F6548]' : 'bg-[#A89060] hover:bg-[#8B7550]'}`}
             >
               Save
             </button>

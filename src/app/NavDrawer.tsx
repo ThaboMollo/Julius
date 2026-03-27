@@ -8,13 +8,13 @@ interface NavDrawerProps {
 }
 
 const navItems = [
-  { to: '/dashboard', label: 'Dashboard', icon: '◈' },
+  { to: '/dashboard', label: 'Home', icon: '◈' },
   { to: '/analytics', label: 'Insights', icon: '◑' },
   { to: '/budget', label: 'Budget', icon: '◉' },
-  { to: '/bills', label: 'Bills', icon: '◎' },
-  { to: '/timeline', label: 'Timeline', icon: '◷' },
+  { to: '/commitments', label: 'Commitments', icon: '◎' },
+  { to: '/timeline', label: 'Projection', icon: '◷' },
   { to: '/planner', label: 'Planner', icon: '◇' },
-  { to: '/transactions', label: 'Spend', icon: '◆' },
+  { to: '/transactions', label: 'Transactions', icon: '◆' },
   { to: '/settings', label: 'Settings', icon: '◐' },
 ]
 

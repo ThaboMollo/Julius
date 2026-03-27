@@ -34,6 +34,7 @@ export const templateRepo: ITemplateRepo = {
     const newTemplate: RecurringTemplate = {
       ...stampNew(template),
       id: generateId(),
+      targetKind: template.targetKind ?? (template.isBill ? 'commitment' : 'budget_item'),
     }
     await db.recurringTemplates.add(newTemplate)
     return newTemplate

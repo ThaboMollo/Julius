@@ -131,8 +131,8 @@ ${budgetSection || '(no budget items)'}
 RECORDED TRANSACTIONS (what I logged in Julius):
 ${txSection || '(no transactions logged)'}
 
-BILLS STATUS:
-${billSection || '(no bills)'}
+COMMITMENTS STATUS:
+${billSection || '(no commitments)'}
 
 PLANNER SCENARIOS:
 ${scenarioSection || '(no scenarios)'}
