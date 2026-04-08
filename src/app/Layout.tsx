@@ -1,7 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/useAuth'
 import { AppHeader } from './AppHeader'
-import { BottomNav } from './BottomNav'
+import { SidebarNav } from './BottomNav'
 
 export function Layout() {
   const { dataVersion } = useAuth()
@@ -13,10 +13,12 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
-      <main className={`flex-1 ${showBottomNav ? 'pb-24' : ''}`}>
-        <Outlet key={dataVersion} />
-      </main>
-      {showBottomNav && <BottomNav />}
+      <div className="mx-auto flex w-full max-w-6xl flex-1 items-start">
+        {showBottomNav && <SidebarNav />}
+        <main className="min-w-0 flex-1">
+          <Outlet key={dataVersion} />
+        </main>
+      </div>
     </div>
   )
 }

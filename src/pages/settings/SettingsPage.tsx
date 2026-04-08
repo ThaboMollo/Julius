@@ -7,6 +7,7 @@ import { useTheme } from '../../app/useTheme'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../../config/flags'
 import { useAuth } from '../../auth/useAuth'
 import { getOpenAIKey, setOpenAIKey, clearOpenAIKey, testOpenAIKey } from '../../ai/openai'
+import { hardResetApp } from '../../app/hardReset'
 
 export function SettingsPage() {
   const { isDark, toggleTheme } = useTheme()
@@ -22,6 +23,7 @@ export function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [apiKeyTesting, setApiKeyTesting] = useState(false)
   const [apiKeyStatus, setApiKeyStatus] = useState<'none' | 'valid' | 'invalid'>('none')
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -80,6 +82,31 @@ export function SettingsPage() {
       setSyncMessage('')
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function handleHardReset() {
+    const confirmed = window.confirm(
+      'Hard reset Julius?\n\nThis will erase all local budgets, transactions, settings, cached data, and sign you out on this device.',
+    )
+
+    if (!confirmed) return
+
+    const doubleConfirmed = window.confirm(
+      'This cannot be undone.\n\nPress OK to permanently reset the app on this device.',
+    )
+
+    if (!doubleConfirmed) return
+
+    setResetting(true)
+
+    try {
+      await hardResetApp()
+      window.location.assign('/login')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Hard reset failed.'
+      alert(`Hard reset failed:\n\n${message}`)
+      setResetting(false)
     }
   }
 
@@ -254,6 +281,21 @@ export function SettingsPage() {
       </Link>
 
       <BankAccountsSection />
+
+      <div className="vnext-card p-5">
+        <h2 className="vnext-section-title mb-3">Danger Zone</h2>
+        <p className="vnext-muted text-sm">
+          Hard reset removes all app data stored on this device and signs you out. Use this only if you want to start over completely.
+        </p>
+        <button
+          type="button"
+          onClick={() => void handleHardReset()}
+          disabled={resetting}
+          className="mt-4 w-full rounded-2xl bg-red-600 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-60"
+        >
+          {resetting ? 'Resetting...' : 'Hard Reset App'}
+        </button>
+      </div>
 
       <div className="vnext-card p-5">
         <h2 className="vnext-section-title mb-4">AI Check-In</h2>
