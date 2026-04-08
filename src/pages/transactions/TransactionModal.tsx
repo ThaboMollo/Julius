@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { format } from 'date-fns'
 import type {
   Transaction,
@@ -24,6 +24,15 @@ function isIncomeCategory(category: Category | undefined): boolean {
   return category?.name === 'Income'
 }
 
+function getDefaultCategoryId(categories: Category[], kind: TransactionKind, currentId = '') {
+  if (currentId) return currentId
+  const availableCategories = categories.filter((category) => {
+    if (kind === 'income') return isIncomeCategory(category)
+    return !isIncomeCategory(category)
+  })
+  return availableCategories[0]?.id ?? ''
+}
+
 export function TransactionModal({
   isOpen,
   onClose,
@@ -36,70 +45,48 @@ export function TransactionModal({
   budgetMonthId,
 }: Props) {
   const seed = transaction ?? initialValues
-  const [kind, setKind] = useState<TransactionKind>(seed?.kind ?? transaction?.kind ?? 'expense')
+  const initialKind = seed?.kind ?? transaction?.kind ?? 'expense'
+  const initialCategoryId = getDefaultCategoryId(categories, initialKind, seed?.categoryId ?? transaction?.categoryId ?? '')
+  const [kind, setKind] = useState<TransactionKind>(initialKind)
   const [amount, setAmount] = useState(seed?.amount?.toString() ?? '')
   const [date, setDate] = useState(
     seed?.date ? format(new Date(seed.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
   )
-  const [categoryId, setCategoryId] = useState(seed?.categoryId ?? '')
-  const [budgetItemId, setBudgetItemId] = useState(seed?.budgetItemId ?? '')
+  const [categoryId, setCategoryId] = useState(initialCategoryId)
+  const [budgetItemId, setBudgetItemId] = useState(
+    initialKind === 'income' ? '' : (seed?.budgetItemId ?? transaction?.budgetItemId ?? ''),
+  )
   const [merchant, setMerchant] = useState(seed?.merchant ?? transaction?.merchant ?? '')
   const [note, setNote] = useState(seed?.note ?? '')
 
-  useEffect(() => {
-    if (transaction) {
-      setKind(transaction.kind)
-      setAmount(transaction.amount.toString())
-      setDate(format(new Date(transaction.date), 'yyyy-MM-dd'))
-      setCategoryId(transaction.categoryId)
-      setBudgetItemId(transaction.budgetItemId || '')
-      setMerchant(transaction.merchant)
-      setNote(transaction.note)
-      return
-    }
+  const availableCategories = useMemo(
+    () =>
+      categories.filter((category) => {
+        if (kind === 'income') return isIncomeCategory(category)
+        return !isIncomeCategory(category)
+      }),
+    [categories, kind],
+  )
 
-    if (initialValues) {
-      setKind(initialValues.kind ?? 'expense')
-      setAmount(initialValues.amount?.toString() ?? '')
-      setDate(initialValues.date ? format(new Date(initialValues.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'))
-      setCategoryId(initialValues.categoryId ?? '')
-      setBudgetItemId(initialValues.budgetItemId ?? '')
-      setMerchant(initialValues.merchant ?? '')
-      setNote(initialValues.note ?? '')
-    }
-  }, [initialValues, transaction])
+  const categoryItems = useMemo(
+    () => (kind === 'expense' ? items.filter((i) => i.categoryId === categoryId) : []),
+    [categoryId, items, kind],
+  )
 
-  const availableCategories = categories.filter((category) => {
-    if (kind === 'income') return isIncomeCategory(category)
-    return !isIncomeCategory(category)
-  })
+  function handleKindChange(nextKind: TransactionKind) {
+    const nextCategoryId = getDefaultCategoryId(categories, nextKind)
+    const nextItems = nextKind === 'expense' ? items.filter((item) => item.categoryId === nextCategoryId) : []
 
-  useEffect(() => {
-    if (!categoryId) {
-      const defaultCategory =
-        availableCategories.find((category) => isIncomeCategory(category) === (kind === 'income')) ??
-        availableCategories[0]
-      if (defaultCategory) {
-        setCategoryId(defaultCategory.id)
-      }
-    }
-  }, [availableCategories, categoryId, kind])
+    setKind(nextKind)
+    setCategoryId(nextCategoryId)
+    setBudgetItemId(nextKind === 'income' ? '' : nextItems.length === 1 ? nextItems[0].id : '')
+  }
 
-  const categoryItems = kind === 'expense' ? items.filter((i) => i.categoryId === categoryId) : []
-
-  useEffect(() => {
-    if (kind === 'income') {
-      setBudgetItemId('')
-      return
-    }
-
-    if (categoryItems.length === 1 && !budgetItemId) {
-      setBudgetItemId(categoryItems[0].id)
-    }
-    if (budgetItemId && !categoryItems.find((i) => i.id === budgetItemId)) {
-      setBudgetItemId('')
-    }
-  }, [budgetItemId, categoryItems, kind])
+  function handleCategoryChange(nextCategoryId: string) {
+    const nextItems = kind === 'expense' ? items.filter((item) => item.categoryId === nextCategoryId) : []
+    setCategoryId(nextCategoryId)
+    setBudgetItemId(nextItems.length === 1 ? nextItems[0].id : '')
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -145,39 +132,39 @@ export function TransactionModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div className="bg-white dark:bg-[#252D3D] w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[90vh] overflow-y-auto">
-        <div className="p-4 border-b dark:border-[#2E3A4E] flex justify-between items-center">
+      <div className="vnext-card w-full max-h-[90vh] overflow-y-auto rounded-t-[1.75rem] sm:max-w-md sm:rounded-[1.75rem]">
+        <div className="flex items-center justify-between border-b border-[var(--border-soft)] p-5">
           <h2 className="text-lg font-semibold dark:text-[#F0EDE4]">
             {transaction ? 'Edit Transaction' : kind === 'income' ? 'Add Income' : 'Add Expense'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 dark:text-[#8A9BAA] hover:text-gray-700 dark:hover:text-[#F0EDE4] text-xl"
+            className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-gray-500 hover:bg-[var(--surface-secondary)] hover:text-gray-700 dark:text-[#8A9BAA] dark:hover:text-[#F0EDE4]"
           >
             ×
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-5">
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
-              onClick={() => setKind('expense')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+              onClick={() => handleKindChange('expense')}
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
                 kind === 'expense'
-                  ? 'bg-[#A89060] text-white'
-                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-700 dark:text-[#F0EDE4]'
+                  ? 'vnext-button-primary'
+                  : 'vnext-button-secondary'
               }`}
             >
               Expense
             </button>
             <button
               type="button"
-              onClick={() => setKind('income')}
-              className={`rounded-lg px-4 py-2 text-sm font-medium ${
+              onClick={() => handleKindChange('income')}
+              className={`rounded-2xl px-4 py-3 text-sm font-semibold ${
                 kind === 'income'
-                  ? 'bg-[#3B7A57] text-white'
-                  : 'bg-gray-100 dark:bg-[#1E2330] text-gray-700 dark:text-[#F0EDE4]'
+                  ? 'vnext-button-success'
+                  : 'vnext-button-secondary'
               }`}
             >
               Income
@@ -194,7 +181,7 @@ export function TransactionModal({
               min="0.01"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060] focus:border-[#A89060] text-lg"
+              className="vnext-input text-lg"
               placeholder="0.00"
               required
               autoFocus
@@ -207,7 +194,7 @@ export function TransactionModal({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+              className="vnext-input"
               required
             />
           </div>
@@ -218,8 +205,8 @@ export function TransactionModal({
             </label>
             <select
               value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="vnext-select"
               required
             >
               <option value="">{kind === 'income' ? 'Select destination' : 'Select a category'}</option>
@@ -237,7 +224,7 @@ export function TransactionModal({
               <select
                 value={budgetItemId}
                 onChange={(e) => setBudgetItemId(e.target.value)}
-                className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+                className="vnext-select"
               >
                 <option value="">None (Unbudgeted)</option>
                 {categoryItems.map((item) => (
@@ -257,7 +244,7 @@ export function TransactionModal({
               type="text"
               value={merchant}
               onChange={(e) => setMerchant(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+              className="vnext-input"
               placeholder={kind === 'income' ? 'e.g. Salary' : 'e.g. Woolworths'}
             />
           </div>
@@ -268,14 +255,14 @@ export function TransactionModal({
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] dark:bg-[#1E2330] dark:text-[#F0EDE4] rounded-lg focus:ring-2 focus:ring-[#A89060]"
+              className="vnext-input"
               placeholder={kind === 'income' ? 'e.g. March salary' : 'e.g. Family dinner'}
             />
           </div>
 
           <div className="flex gap-3 pt-4">
             {onDelete && (
-              <button type="button" onClick={onDelete} className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg">
+              <button type="button" onClick={onDelete} className="rounded-2xl px-4 py-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20">
                 Delete
               </button>
             )}
@@ -283,13 +270,13 @@ export function TransactionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-600 dark:text-[#8A9BAA] hover:bg-gray-100 dark:hover:bg-[#1E2330] rounded-lg"
+              className="vnext-button-secondary rounded-2xl px-4 py-2"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`px-6 py-2 text-white rounded-lg ${kind === 'income' ? 'bg-[#3B7A57] hover:bg-[#2F6548]' : 'bg-[#A89060] hover:bg-[#8B7550]'}`}
+              className={`rounded-2xl px-6 py-2 text-white ${kind === 'income' ? 'vnext-button-success' : 'vnext-button-primary'}`}
             >
               Save
             </button>

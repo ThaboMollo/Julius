@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { format, isToday, isTomorrow, isPast } from 'date-fns'
-import { useMonth } from '../../app/MonthContext'
+import { useMonth } from '../../app/useMonth'
 import { budgetMonthRepo, commitmentRepo, transactionRepo, settingsRepo } from '../../data/local'
 import type { AppSettings } from '../../domain/models'
 import { buildTimeline, totalIncome, totalExpenses, type TimelineEvent } from '../../domain/rules'
@@ -13,11 +13,7 @@ export function TimelinePage() {
   const [timeline, setTimeline] = useState<TimelineEvent[]>([])
   const [startingBalance, setStartingBalance] = useState(0)
 
-  useEffect(() => {
-    loadData()
-  }, [monthKey])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const year = selectedMonth.getFullYear()
@@ -36,7 +32,11 @@ export function TimelinePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedMonth])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData, monthKey])
 
   if (loading || !settings) {
     return (

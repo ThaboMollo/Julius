@@ -96,8 +96,10 @@ export function PlannerPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading planner...</div>
+      <div className="page-shell page-shell-bottom-nav">
+        <div className="vnext-card flex items-center justify-center p-8">
+          <div className="vnext-muted">Loading planner...</div>
+        </div>
       </div>
     )
   }
@@ -121,33 +123,33 @@ export function PlannerPage() {
   }
 
   return (
-    <div className="p-4 space-y-4 pb-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Planner</h1>
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">Model major purchases</p>
+    <div className="page-shell page-shell-bottom-nav space-y-4">
+      <div className="vnext-card p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="vnext-section-title text-[1.35rem]">Planner</h1>
+            <p className="vnext-muted mt-1 text-sm">Model major purchases</p>
+          </div>
+          {!showNewForm && (
+            <button
+              onClick={() => setShowNewForm(true)}
+              className="vnext-button-primary rounded-2xl px-4 py-3 text-sm font-semibold"
+            >
+              + New Scenario
+            </button>
+          )}
         </div>
-        {!showNewForm && (
-          <button
-            onClick={() => setShowNewForm(true)}
-            className="px-4 py-2 bg-[#A89060] hover:bg-[#8B7550] text-white rounded-lg text-sm font-medium"
-          >
-            + New Scenario
-          </button>
-        )}
       </div>
 
-      {/* New scenario form */}
       {showNewForm && (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow space-y-3">
-          <h2 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">New Scenario</h2>
+        <div className="vnext-card p-5 space-y-4">
+          <h2 className="vnext-section-title">New Scenario</h2>
           <input
             type="text"
             placeholder="Name (e.g. New Car)"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#2E3A4E] bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] text-sm"
+            className="vnext-input text-sm"
             autoFocus
           />
           <input
@@ -155,19 +157,19 @@ export function PlannerPage() {
             placeholder="Description (optional)"
             value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#2E3A4E] bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] text-sm"
+            className="vnext-input text-sm"
           />
           <div className="flex gap-2">
             <button
               onClick={createScenario}
               disabled={saving || !newName.trim()}
-              className="flex-1 py-2 bg-[#A89060] hover:bg-[#8B7550] disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+              className="vnext-button-primary flex-1 rounded-2xl py-3 text-sm font-semibold disabled:opacity-50"
             >
               {saving ? 'Creating...' : 'Create'}
             </button>
             <button
               onClick={() => { setShowNewForm(false); setNewName(''); setNewDesc('') }}
-              className="px-4 py-2 bg-gray-100 dark:bg-[#1E2330] text-gray-600 dark:text-[#8A9BAA] rounded-lg text-sm"
+              className="vnext-button-secondary rounded-2xl px-4 py-3 text-sm font-semibold"
             >
               Cancel
             </button>
@@ -175,12 +177,11 @@ export function PlannerPage() {
         </div>
       )}
 
-      {/* Scenario cards */}
       {scenarios.length === 0 ? (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow text-center">
-          <div className="text-4xl mb-3">◇</div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">No Scenarios Yet</h3>
-          <p className="text-gray-600 dark:text-[#8A9BAA] text-sm">
+        <div className="vnext-card p-8 text-center">
+          <div className="mb-3 text-3xl">◇</div>
+          <h3 className="vnext-section-title">No Scenarios Yet</h3>
+          <p className="vnext-muted mt-2 text-sm">
             Create a scenario to model a major purchase and see if you can afford it.
           </p>
         </div>
@@ -230,29 +231,30 @@ function ScenarioCard({ scenario, baseline, onOpen, onDelete }: ScenarioCardProp
 
   return (
     <div
-      className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow cursor-pointer hover:shadow-md transition-shadow"
+      className="vnext-card cursor-pointer p-4 transition-transform hover:-translate-y-0.5"
       onClick={onOpen}
     >
-      <div className="flex justify-between items-start">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">{scenario.name}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold text-[var(--text-primary)]">{scenario.name}</h3>
             {expenses.length > 0 && (
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${vc.color}`}>
+              <span className={`vnext-badge ${vc.color}`}>
                 {vc.label}
               </span>
             )}
           </div>
           {scenario.description && (
-            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-0.5">{scenario.description}</p>
+            <p className="vnext-muted mt-1 text-xs">{scenario.description}</p>
           )}
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA] mt-1">
+          <p className="vnext-muted mt-2 text-sm">
             {expenses.length} expense{expenses.length !== 1 ? 's' : ''} · {formatCurrency(total)}/mo
           </p>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete() }}
-          className="text-gray-300 dark:text-[#4A5568] hover:text-red-400 ml-2 text-lg leading-none"
+          className="rounded-full p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+          aria-label={`Delete ${scenario.name}`}
         >
           ✕
         </button>
@@ -354,12 +356,12 @@ function ScenarioDetailView({ scenario, baseline, onBack, onDeleted }: ScenarioD
       : 'text-gray-500 dark:text-[#8A9BAA]'
 
   return (
-    <div className="p-4 space-y-4 pb-8">
-      {/* Back + title */}
-      <div className="flex items-center gap-3">
+    <div className="page-shell page-shell-bottom-nav space-y-4">
+      <div className="vnext-card p-5">
+        <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="text-[#C4A86B] text-lg leading-none"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--surface-secondary)] text-lg leading-none text-[#C4A86B]"
           aria-label="Back"
         >
           ←
@@ -371,42 +373,42 @@ function ScenarioDetailView({ scenario, baseline, onBack, onDeleted }: ScenarioD
             onChange={(e) => setNameValue(e.target.value)}
             onBlur={saveScenarioName}
             onKeyDown={(e) => e.key === 'Enter' && saveScenarioName()}
-            className="flex-1 text-xl font-bold bg-transparent border-b border-[#C4A86B] text-gray-800 dark:text-[#F0EDE4] outline-none"
+            className="flex-1 border-b border-[#C4A86B] bg-transparent text-xl font-bold text-[var(--text-primary)] outline-none"
             autoFocus
           />
         ) : (
           <h1
-            className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4] flex-1 cursor-pointer"
+            className="flex-1 cursor-pointer text-xl font-bold text-[var(--text-primary)]"
             onClick={() => setEditingName(true)}
           >
             {nameValue}
-            <span className="text-sm text-gray-400 dark:text-[#8A9BAA] ml-2">✎</span>
+            <span className="ml-2 text-sm text-gray-400 dark:text-[#8A9BAA]">✎</span>
           </h1>
         )}
         <button
           onClick={onDeleted}
-          className="text-sm text-red-400 hover:text-red-500"
+          className="rounded-full px-3 py-2 text-sm text-red-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
         >
           Delete
         </button>
       </div>
+      </div>
 
-      {/* Expense rows */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow">
+      <div className="vnext-card">
         <div className="px-4 pt-4 pb-2 flex justify-between items-center">
-          <h2 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">Monthly Expenses</h2>
+          <h2 className="font-semibold text-[var(--text-primary)]">Monthly Expenses</h2>
           <button
             onClick={addExpense}
-            className="text-sm text-[#C4A86B] font-medium hover:text-[#A89060]"
+            className="text-sm font-medium text-[#C4A86B] hover:text-[#A89060]"
           >
             + Add
           </button>
         </div>
 
         {loading ? (
-          <div className="p-4 text-gray-400 dark:text-[#8A9BAA] text-sm">Loading...</div>
+          <div className="p-4 text-sm text-gray-400 dark:text-[#8A9BAA]">Loading...</div>
         ) : expenses.length === 0 ? (
-          <div className="px-4 pb-4 text-sm text-gray-400 dark:text-[#8A9BAA] italic">
+          <div className="px-4 pb-4 text-sm italic text-gray-400 dark:text-[#8A9BAA]">
             No expenses yet. Tap "+ Add" to add one.
           </div>
         ) : (
@@ -418,7 +420,7 @@ function ScenarioDetailView({ scenario, baseline, onBack, onDeleted }: ScenarioD
                   placeholder="Name (e.g. Petrol)"
                   value={exp.name}
                   onChange={(e) => updateExpense(exp.id, 'name', e.target.value)}
-                  className="flex-1 text-sm bg-transparent text-gray-800 dark:text-[#F0EDE4] outline-none placeholder-gray-300 dark:placeholder-[#4A5568] min-w-0"
+                  className="min-w-0 flex-1 bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder-gray-300 dark:placeholder-[#4A5568]"
                 />
                 <div className="flex items-center gap-1 shrink-0">
                   <span className="text-xs text-gray-400 dark:text-[#8A9BAA]">R</span>
@@ -427,7 +429,7 @@ function ScenarioDetailView({ scenario, baseline, onBack, onDeleted }: ScenarioD
                     value={exp.monthlyAmount || ''}
                     onChange={(e) => updateExpense(exp.id, 'monthlyAmount', e.target.value)}
                     placeholder="0"
-                    className="w-24 text-sm text-right bg-transparent text-gray-800 dark:text-[#F0EDE4] outline-none placeholder-gray-300 dark:placeholder-[#4A5568]"
+                    className="w-24 bg-transparent text-right text-sm text-[var(--text-primary)] outline-none placeholder-gray-300 dark:placeholder-[#4A5568]"
                   />
                   <span className="text-xs text-gray-400 dark:text-[#8A9BAA]">/mo</span>
                 </div>
@@ -444,18 +446,17 @@ function ScenarioDetailView({ scenario, baseline, onBack, onDeleted }: ScenarioD
 
         {/* Total row */}
         {expenses.length > 0 && (
-          <div className="flex justify-between items-center px-4 py-3 border-t dark:border-[#2E3A4E] bg-gray-50 dark:bg-[#1E2330] rounded-b-xl">
-            <span className="text-sm font-semibold text-gray-700 dark:text-[#8A9BAA]">Total</span>
-            <span className="font-semibold text-gray-800 dark:text-[#F0EDE4]">
+          <div className="flex items-center justify-between rounded-b-xl border-t border-[var(--border-soft)] bg-[var(--surface-secondary)] px-4 py-3">
+            <span className="text-sm font-semibold text-[var(--text-secondary)]">Total</span>
+            <span className="font-semibold text-[var(--text-primary)]">
               {formatCurrency(monthlyTotal)}/mo
             </span>
           </div>
         )}
       </div>
 
-      {/* Forecast panel */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4 space-y-3">
-        <h2 className="font-semibold text-gray-800 dark:text-[#F0EDE4]">Forecast</h2>
+      <div className="vnext-card p-4 space-y-3">
+        <h2 className="font-semibold text-[var(--text-primary)]">Forecast</h2>
 
         {!baseline.incomeKnown && (
           <div className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg px-3 py-2">

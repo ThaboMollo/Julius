@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { format } from 'date-fns'
 import {
@@ -20,7 +20,7 @@ import {
   getRecentTransactions,
 } from '../../domain/rules'
 import { formatCurrency } from '../../domain/constants'
-import { useMonth } from '../../app/MonthContext'
+import { useMonth } from '../../app/useMonth'
 
 export function DashboardPage() {
   const { selectedMonth, monthKey } = useMonth()
@@ -32,11 +32,7 @@ export function DashboardPage() {
   const [categories, setCategories] = useState<Category[]>([])
   const [commitments, setCommitments] = useState<Commitment[]>([])
 
-  useEffect(() => {
-    loadData()
-  }, [monthKey])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const year = selectedMonth.getFullYear()
@@ -64,12 +60,18 @@ export function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedMonth])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData, monthKey])
 
   if (loading || !budgetMonth) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
+      <div className="page-shell page-shell-bottom-nav">
+        <div className="vnext-card flex items-center justify-center p-8">
+          <div className="vnext-muted">Loading...</div>
+        </div>
       </div>
     )
   }
@@ -87,144 +89,90 @@ export function DashboardPage() {
   const hasAnyTransactions = transactions.length > 0
 
   return (
-    <div className="p-4 space-y-4">
-      <div className="rounded-xl p-5 shadow-lg" style={{ background: 'linear-gradient(135deg, #3B4A2F 0%, #5A6B3F 100%)' }}>
-        <div className="text-sm mb-1" style={{ color: '#C4A86B', opacity: 0.9 }}>
-          Safe to spend
-        </div>
-        <div className={`text-3xl font-bold mb-3 ${spendable < 0 ? 'text-red-200' : ''}`} style={{ color: spendable < 0 ? undefined : '#C4A86B' }}>
-          {formatCurrency(spendable)}
-        </div>
-        <div className="flex justify-between text-sm text-white opacity-80">
-          <span>{income > 0 ? `${formatCurrency(income)} income logged` : 'No income recorded yet'}</span>
-          <span>{upcomingCommitments.length} commitments coming up</span>
-        </div>
-      </div>
+    <div className="page-shell page-shell-bottom-nav space-y-4">
+      <HomeHeroCard spendable={spendable} income={income} upcomingCount={upcomingCommitments.length} />
 
       <div className="grid grid-cols-2 gap-3">
-        <Link
-          to="/transactions"
-          className="bg-[#A89060] hover:bg-[#8B7550] text-white rounded-xl p-4 shadow"
-        >
-          <div className="text-sm opacity-80">Primary action</div>
-          <div className="text-lg font-semibold mt-1">+ Add Expense</div>
-        </Link>
-        <Link
-          to="/transactions"
-          className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow hover:bg-gray-50 dark:hover:bg-[#2E3A4E]"
-        >
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Need income?</div>
-          <div className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mt-1">
-            {income > 0 ? 'Add another income' : 'Add income'}
-          </div>
-        </Link>
+        <ActionCard
+          to="/transactions?action=expense"
+          eyebrow="Primary action"
+          title="+ Add Expense"
+          accent="primary"
+        />
+        <ActionCard
+          to="/transactions?action=income"
+          eyebrow="Need income?"
+          title={income > 0 ? 'Add another income' : 'Add income'}
+          accent="secondary"
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Income</div>
-          <div className="text-xl font-bold text-green-600">{formatCurrency(income)}</div>
-        </div>
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Expenses</div>
-          <div className="text-xl font-bold text-red-600">{formatCurrency(expenses)}</div>
-        </div>
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Savings target</div>
-          <div className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(plannedSavings)}</div>
-        </div>
+        <KpiCard label="Income" value={formatCurrency(income)} tone="success" />
+        <KpiCard label="Expenses" value={formatCurrency(expenses)} tone="danger" />
+        <KpiCard label="Savings target" value={formatCurrency(plannedSavings)} />
       </div>
 
       {!hasAnyTransactions && (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl p-6 shadow">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-2">Start here</h2>
-          <p className="text-sm text-gray-600 dark:text-[#8A9BAA] mb-4">
-            Your month is ready. Record income first, then add expenses as they happen. You do not need to set up a budget before using the app.
-          </p>
-          <div className="flex gap-2">
-            <Link to="/transactions" className="px-4 py-2 bg-[#3B7A57] text-white rounded-lg hover:bg-[#2F6548]">
-              Add income
-            </Link>
-            <Link to="/transactions" className="px-4 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]">
-              Add expense
-            </Link>
-          </div>
-        </div>
+        <EmptyStartCard />
       )}
 
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Potential savings</h2>
-          <Link to="/transactions" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
-            Review
-          </Link>
-        </div>
+      <SectionCard title="Potential savings" linkLabel="Review" to="/transactions">
         {potentialSavings.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">Not enough activity yet to suggest anything.</p>
+          <p className="vnext-muted text-sm">Not enough activity yet to suggest anything.</p>
         ) : (
           <div className="space-y-3">
             {potentialSavings.map((item) => (
-              <div key={`${item.label}-${item.reason}`} className="flex justify-between items-start border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
-                <div>
-                  <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{item.label}</div>
-                  <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">{item.reason}</div>
+              <div key={`${item.label}-${item.reason}`} className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--border-soft)] p-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[var(--text-primary)]">{item.label}</div>
+                  <div className="vnext-muted text-xs">{item.reason}</div>
                 </div>
-                <div className="text-[#8B7550] dark:text-[#C4A86B] font-medium">{formatCurrency(item.amount)}</div>
+                <div className="shrink-0 font-semibold text-[#8B7550] dark:text-[#C4A86B]">{formatCurrency(item.amount)}</div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Upcoming commitments</h2>
-          <Link to="/commitments" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
-            Open list
-          </Link>
-        </div>
+      <SectionCard title="Upcoming commitments" linkLabel="Open list" to="/commitments">
         {upcomingCommitments.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">No upcoming commitments yet.</p>
+          <p className="vnext-muted text-sm">No upcoming commitments yet.</p>
         ) : (
           <div className="space-y-3">
             {upcomingCommitments.map((commitment) => (
-              <div key={commitment.id} className="flex justify-between items-center border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
-                <div>
-                  <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{commitment.name}</div>
-                  <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">
+              <div key={commitment.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] p-3">
+                <div className="min-w-0">
+                  <div className="font-semibold text-[var(--text-primary)]">{commitment.name}</div>
+                  <div className="vnext-muted text-xs">
                     {commitment.dueDate ? `Due ${format(new Date(commitment.dueDate), 'd MMM')}` : 'No due date'}
                   </div>
                 </div>
-                <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{formatCurrency(commitment.amount)}</div>
+                <div className="shrink-0 font-semibold text-[var(--text-primary)]">{formatCurrency(commitment.amount)}</div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl p-4 shadow">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Recent transactions</h2>
-          <Link to="/transactions" className="text-sm text-[#A89060] dark:text-[#C4A86B]">
-            View all
-          </Link>
-        </div>
+      <SectionCard title="Recent transactions" linkLabel="View all" to="/transactions">
         {recentTransactions.length === 0 ? (
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">No transactions recorded yet.</p>
+          <p className="vnext-muted text-sm">No transactions recorded yet.</p>
         ) : (
           <div className="space-y-3">
             {recentTransactions.map((tx) => {
               const category = categories.find((entry) => entry.id === tx.categoryId)
-              const label = tx.merchant || tx.note || category?.name || 'Unknown'
+              const item = items.find((entry) => entry.id === tx.budgetItemId)
+              const label = tx.merchant || tx.note || item?.name || category?.name || 'Unknown'
               return (
-                <div key={tx.id} className="flex justify-between items-center border-b dark:border-[#2E3A4E] last:border-0 pb-2 last:pb-0">
-                  <div>
-                    <div className="font-medium text-gray-800 dark:text-[#F0EDE4]">{label}</div>
-                    <div className="text-xs text-gray-500 dark:text-[#8A9BAA]">
+                <div key={tx.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-soft)] p-3">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-[var(--text-primary)]">{label}</div>
+                    <div className="vnext-muted text-xs">
                       {format(new Date(tx.date), 'd MMM')} · {category?.name || 'No category'}
                     </div>
                   </div>
-                  <div className={tx.kind === 'income' ? 'text-green-600 font-medium' : 'text-gray-800 dark:text-[#F0EDE4] font-medium'}>
+                  <div className={`shrink-0 font-semibold ${tx.kind === 'income' ? 'text-green-600' : 'text-[var(--text-primary)]'}`}>
                     {tx.kind === 'income' ? '+' : '-'}
                     {formatCurrency(tx.amount)}
                   </div>
@@ -233,7 +181,126 @@ export function DashboardPage() {
             })}
           </div>
         )}
+      </SectionCard>
+    </div>
+  )
+}
+
+function HomeHeroCard({
+  spendable,
+  income,
+  upcomingCount,
+}: {
+  spendable: number
+  income: number
+  upcomingCount: number
+}) {
+  return (
+    <section
+      className="rounded-[1.75rem] px-5 py-6 text-white shadow-[0_24px_60px_rgba(59,74,47,0.28)]"
+      style={{ background: 'linear-gradient(145deg, #3B4A2F 0%, #52643A 55%, #6F7F48 100%)' }}
+    >
+      <div className="text-sm font-medium" style={{ color: '#E8DABC' }}>
+        Safe to spend
+      </div>
+      <div className={`mt-2 text-4xl font-bold tracking-tight ${spendable < 0 ? 'text-red-100' : ''}`}>
+        {formatCurrency(spendable)}
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-3 text-sm text-white/80">
+        <div className="rounded-2xl bg-white/10 p-3 backdrop-blur-sm">
+          {income > 0 ? `${formatCurrency(income)} income logged` : 'No income recorded yet'}
+        </div>
+        <div className="rounded-2xl bg-white/10 p-3 text-right backdrop-blur-sm">
+          {upcomingCount} commitments coming up
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ActionCard({
+  to,
+  eyebrow,
+  title,
+  accent,
+}: {
+  to: string
+  eyebrow: string
+  title: string
+  accent: 'primary' | 'secondary'
+}) {
+  const className =
+    accent === 'primary'
+      ? 'rounded-[1.5rem] bg-[#A89060] p-4 text-white shadow-[0_18px_40px_rgba(168,144,96,0.28)]'
+      : 'vnext-card p-4'
+
+  return (
+    <Link to={to} className={className}>
+      <div className={`text-sm ${accent === 'primary' ? 'text-white/80' : 'vnext-muted'}`}>{eyebrow}</div>
+      <div className={`mt-2 text-lg font-semibold ${accent === 'primary' ? 'text-white' : 'text-[var(--text-primary)]'}`}>{title}</div>
+    </Link>
+  )
+}
+
+function KpiCard({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string
+  value: string
+  tone?: 'default' | 'success' | 'danger'
+}) {
+  const toneClass =
+    tone === 'success' ? 'text-green-600' : tone === 'danger' ? 'text-red-600' : 'text-[var(--text-primary)]'
+
+  return (
+    <div className="vnext-card p-4">
+      <div className="vnext-muted text-sm">{label}</div>
+      <div className={`mt-2 text-lg font-bold ${toneClass}`}>{value}</div>
+    </div>
+  )
+}
+
+function EmptyStartCard() {
+  return (
+    <div className="vnext-card p-6">
+      <h2 className="vnext-section-title">Start here</h2>
+      <p className="vnext-muted mt-2 text-sm">
+        Your month is ready. Record income first, then add expenses as they happen. You do not need to set up a budget before using the app.
+      </p>
+      <div className="mt-4 flex gap-2">
+        <Link to="/transactions?action=income" className="vnext-button-success rounded-2xl px-4 py-2.5 text-sm font-semibold">
+          Add income
+        </Link>
+        <Link to="/transactions?action=expense" className="vnext-button-primary rounded-2xl px-4 py-2.5 text-sm font-semibold">
+          Add expense
+        </Link>
       </div>
     </div>
+  )
+}
+
+function SectionCard({
+  title,
+  linkLabel,
+  to,
+  children,
+}: {
+  title: string
+  linkLabel: string
+  to: string
+  children: ReactNode
+}) {
+  return (
+    <section className="vnext-card p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="vnext-section-title">{title}</h2>
+        <Link to={to} className="vnext-link">
+          {linkLabel}
+        </Link>
+      </div>
+      {children}
+    </section>
   )
 }

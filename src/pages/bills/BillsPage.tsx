@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { format } from 'date-fns'
-import { useMonth } from '../../app/MonthContext'
+import { useMonth } from '../../app/useMonth'
 import { budgetMonthRepo, commitmentRepo, categoryRepo, transactionRepo } from '../../data/local'
 import type { BudgetMonth, Commitment, Category, CreateTransaction } from '../../domain/models'
 import { getCommitmentStatus, type BillDueStatus, getUpcomingCommitments } from '../../domain/rules'
@@ -28,11 +28,7 @@ export function CommitmentsPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [pendingCommitment, setPendingCommitment] = useState<Commitment | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [monthKey])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const year = selectedMonth.getFullYear()
@@ -45,7 +41,11 @@ export function CommitmentsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedMonth])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData, monthKey])
 
   async function togglePaid(commitment: Commitment) {
     if (!budgetMonth) return

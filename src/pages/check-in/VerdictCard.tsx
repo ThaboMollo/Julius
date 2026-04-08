@@ -1,5 +1,3 @@
-import { useEffect, useState } from 'react'
-
 interface VerdictCardProps {
   verdict: 'doing_well' | 'fucking_up'
   verdictSummary: string
@@ -53,19 +51,11 @@ function ProgressRing({ percent, verdict }: { percent: number; verdict: string }
 }
 
 export function VerdictCard({ verdict, verdictSummary, spendingProgressPercent, monthLabel, compact = false }: VerdictCardProps) {
-  const [animate, setAnimate] = useState(false)
-
-  useEffect(() => {
-    setAnimate(true)
-    const timer = setTimeout(() => setAnimate(false), 1500)
-    return () => clearTimeout(timer)
-  }, [])
-
   const isGood = verdict === 'doing_well'
   const verdictText = isGood ? "You're doing well" : "You're fucking up"
   const verdictColor = isGood ? 'text-[#A89060]' : 'text-red-500'
   const bgColor = isGood ? 'bg-[#F5EFE2] dark:bg-[#2A2520]' : 'bg-red-50 dark:bg-[#2D2025]'
-  const animClass = animate ? (isGood ? 'checkin-confetti' : 'checkin-shake') : ''
+  const animClass = isGood ? 'checkin-confetti' : 'checkin-shake'
 
   if (compact) {
     return (

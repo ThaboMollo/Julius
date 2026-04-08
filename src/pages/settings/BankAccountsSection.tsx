@@ -180,9 +180,9 @@ export function BankAccountsSection() {
   if (loading) return null
 
   return (
-    <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
+    <div className="vnext-card p-5">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Bank Accounts</h2>
+        <h2 className="vnext-section-title">Bank Accounts</h2>
         {!showAddForm && (
           <button
             onClick={() => setShowAddForm(true)}
@@ -195,15 +195,15 @@ export function BankAccountsSection() {
 
       {/* Add bank form */}
       {showAddForm && (
-        <div className="space-y-3 mb-4 p-3 bg-gray-50 dark:bg-[#1E2330] rounded-xl">
+        <div className="vnext-card-muted mb-4 space-y-3 p-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
               Bank
             </label>
             <select
               value={newBankCode}
               onChange={(e) => setNewBankCode(e.target.value as BankConfig['bankCode'])}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#252D3D] text-gray-800 dark:text-[#F0EDE4] text-sm"
+              className="vnext-select text-sm"
             >
               {BANK_CODES.map((code) => (
                 <option key={code} value={code}>{BANK_LABELS[code]}</option>
@@ -211,13 +211,13 @@ export function BankAccountsSection() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
               Upload Frequency
             </label>
             <select
               value={newFreq}
               onChange={(e) => setNewFreq(e.target.value as BankConfig['uploadFrequency'])}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#252D3D] text-gray-800 dark:text-[#F0EDE4] text-sm"
+              className="vnext-select text-sm"
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
@@ -228,13 +228,13 @@ export function BankAccountsSection() {
             <button
               onClick={addBank}
               disabled={saving}
-              className="flex-1 py-2 bg-[#A89060] hover:bg-[#8B7550] disabled:opacity-50 text-white rounded-lg text-sm font-medium"
+              className="vnext-button-primary flex-1 rounded-2xl py-2.5 text-sm font-semibold disabled:opacity-50"
             >
               {saving ? 'Adding...' : 'Add Bank'}
             </button>
             <button
               onClick={() => setShowAddForm(false)}
-              className="px-4 py-2 bg-gray-100 dark:bg-[#2E3A4E] text-gray-600 dark:text-[#8A9BAA] rounded-lg text-sm"
+              className="vnext-button-secondary rounded-2xl px-4 py-2.5 text-sm font-semibold"
             >
               Cancel
             </button>

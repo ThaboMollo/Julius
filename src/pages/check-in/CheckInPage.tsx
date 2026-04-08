@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { format, subMonths, startOfMonth } from 'date-fns'
-import { useMonth } from '../../app/MonthContext'
+import { useMonth } from '../../app/useMonth'
 import { parseStatement, PdfPasswordRequired, PdfScannedImage } from '../../data/parsers'
 import { getOpenAIKey, analyzeCheckIn } from '../../ai/openai'
 import {
@@ -90,29 +90,20 @@ export function CheckInPage() {
   const [isSticky, setIsSticky] = useState(false)
   const verdictRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    void loadInitial()
-  }, [])
+  const loadModalData = useCallback(async () => {
+    const bm = await budgetMonthRepo.getOrCreate(year, month)
+    setBudgetMonthId(bm.id)
+    const [cats, items, groups] = await Promise.all([
+      categoryRepo.getActive(),
+      budgetItemRepo.getByMonth(bm.id),
+      budgetGroupRepo.getAll(),
+    ])
+    setAllCategories(cats)
+    setAllItems(items)
+    setAllGroups(groups.filter((g) => g.isActive))
+  }, [month, year])
 
-  useEffect(() => {
-    if (pageState !== 'loading') return
-    const interval = setInterval(() => {
-      setLoadingMsg(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)])
-    }, 2500)
-    return () => clearInterval(interval)
-  }, [pageState])
-
-  useEffect(() => {
-    if (pageState !== 'results') return
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsSticky(!entry.isIntersecting),
-      { threshold: 0 }
-    )
-    if (verdictRef.current) observer.observe(verdictRef.current)
-    return () => observer.disconnect()
-  }, [pageState])
-
-  async function loadInitial() {
+  const loadInitial = useCallback(async () => {
     const [bankList, existing] = await Promise.all([
       bankConfigRepo.getAll(),
       checkInResultRepo.getByMonthKey(monthKey),
@@ -139,20 +130,32 @@ export function CheckInPage() {
       const planned = totalPlanned(items)
       setBankDebitTotal(planned > 0 ? (existing.spendingProgressPercent / 100) * planned : 0)
     }
-  }
+  }, [loadModalData, monthKey, month, year])
 
-  async function loadModalData() {
-    const bm = await budgetMonthRepo.getOrCreate(year, month)
-    setBudgetMonthId(bm.id)
-    const [cats, items, groups] = await Promise.all([
-      categoryRepo.getActive(),
-      budgetItemRepo.getByMonth(bm.id),
-      budgetGroupRepo.getAll(),
-    ])
-    setAllCategories(cats)
-    setAllItems(items)
-    setAllGroups(groups.filter((g) => g.isActive))
-  }
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadInitial()
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [loadInitial])
+
+  useEffect(() => {
+    if (pageState !== 'loading') return
+    const interval = setInterval(() => {
+      setLoadingMsg(LOADING_MESSAGES[Math.floor(Math.random() * LOADING_MESSAGES.length)])
+    }, 2500)
+    return () => clearInterval(interval)
+  }, [pageState])
+
+  useEffect(() => {
+    if (pageState !== 'results') return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsSticky(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    if (verdictRef.current) observer.observe(verdictRef.current)
+    return () => observer.disconnect()
+  }, [pageState])
 
   async function handleUpload() {
     const files = fileRef.current?.files

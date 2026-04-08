@@ -1,5 +1,5 @@
 import { format } from 'date-fns'
-import { useMonth } from './MonthContext'
+import { useMonth } from './useMonth'
 
 export function MonthSelector() {
   const { selectedMonth, goToNextMonth, goToPreviousMonth, goToCurrentMonth } = useMonth()
@@ -7,10 +7,10 @@ export function MonthSelector() {
   const isCurrentMonth = format(selectedMonth, 'yyyy-MM') === format(new Date(), 'yyyy-MM')
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 text-white">
       <button
         onClick={goToPreviousMonth}
-        className="p-1.5 hover:bg-white/10 rounded text-lg text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10"
         aria-label="Previous month"
       >
         ‹
@@ -18,14 +18,14 @@ export function MonthSelector() {
 
       <button
         onClick={goToCurrentMonth}
-        className="text-sm font-medium min-w-[100px] text-center hover:bg-white/10 rounded px-2 py-1 text-white"
+        className="min-w-[104px] rounded-full px-3 py-2 text-center text-sm font-medium hover:bg-white/10"
       >
         {format(selectedMonth, 'MMM yyyy')}
       </button>
 
       <button
         onClick={goToNextMonth}
-        className="p-1.5 hover:bg-white/10 rounded text-lg text-white"
+        className="flex h-9 w-9 items-center justify-center rounded-full hover:bg-white/10"
         aria-label="Next month"
       >
         ›
@@ -34,7 +34,7 @@ export function MonthSelector() {
       {!isCurrentMonth && (
         <button
           onClick={goToCurrentMonth}
-          className="text-xs bg-[#A89060] hover:bg-[#C4A86B] text-white rounded px-2 py-1 ml-1"
+          className="ml-1 rounded-full bg-[#A89060] px-2.5 py-1 text-xs text-white hover:bg-[#C4A86B]"
         >
           Today
         </button>

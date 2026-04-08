@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { settingsRepo } from '../../data/local'
 import { BankAccountsSection } from './BankAccountsSection'
 import type { AppSettings } from '../../domain/models'
-import { useTheme } from '../../app/ThemeContext'
+import { useTheme } from '../../app/useTheme'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../../config/flags'
 import { useAuth } from '../../auth/useAuth'
 import { getOpenAIKey, setOpenAIKey, clearOpenAIKey, testOpenAIKey } from '../../ai/openai'
@@ -85,27 +85,31 @@ export function SettingsPage() {
 
   if (loading || !settings) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-gray-500 dark:text-[#8A9BAA]">Loading...</div>
+      <div className="page-shell page-shell-bottom-nav">
+        <div className="vnext-card flex items-center justify-center p-8">
+          <div className="vnext-muted">Loading...</div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 space-y-6 pb-24">
-      <h1 className="text-xl font-bold text-gray-800 dark:text-[#F0EDE4]">Settings</h1>
+    <div className="page-shell page-shell-bottom-nav space-y-5">
+      <div className="vnext-card p-5">
+        <h1 className="vnext-section-title text-[1.35rem]">Settings</h1>
+      </div>
 
       {ENABLE_AUTH && ENABLE_SUPABASE && (
-        <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4 space-y-3">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4]">Account</h2>
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+        <div className="vnext-card p-5 space-y-3">
+          <h2 className="vnext-section-title">Account</h2>
+          <p className="vnext-muted text-sm">
             {offlineMode
               ? 'Offline mode is active. Local data is still fully available.'
               : user
                 ? `Signed in as ${user.email ?? 'your account'}.`
                 : 'Not signed in.'}
           </p>
-          <p className="text-sm text-gray-500 dark:text-[#8A9BAA]">
+          <p className="vnext-muted text-sm">
             Cloud backup status:{' '}
             {offlineMode
               ? 'Offline'
@@ -122,7 +126,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 onClick={() => void signOut()}
-                className="px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800"
+                className="rounded-2xl bg-gray-700 px-4 py-2.5 text-white hover:bg-gray-800"
               >
                 Logout
               </button>
@@ -131,7 +135,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 onClick={continueOffline}
-                className="px-3 py-2 bg-gray-200 dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] rounded-lg"
+                className="vnext-button-secondary rounded-2xl px-4 py-2.5"
               >
                 Continue offline
               </button>
@@ -139,7 +143,7 @@ export function SettingsPage() {
               <button
                 type="button"
                 onClick={resumeOnline}
-                className="px-3 py-2 border border-[#A89060] text-[#A89060] rounded-lg hover:bg-[#F5EFE2]"
+                className="rounded-2xl border border-[#A89060] px-4 py-2.5 text-[#A89060] hover:bg-[#F5EFE2] dark:hover:bg-[#2A2215]"
               >
                 Resume online
               </button>
@@ -147,7 +151,7 @@ export function SettingsPage() {
             {!user && !offlineMode && (
               <Link
                 to="/login"
-                className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
+                className="vnext-button-primary rounded-2xl px-4 py-2.5"
               >
                 Login
               </Link>
@@ -157,23 +161,22 @@ export function SettingsPage() {
                 type="button"
                 onClick={() => void handleManualSync()}
                 disabled={syncing}
-                className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] disabled:opacity-60"
+                className="vnext-button-primary rounded-2xl px-4 py-2.5 disabled:opacity-60"
               >
                 {syncing ? 'Syncing...' : 'Sync now'}
               </button>
             )}
           </div>
-          {syncMessage && <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">{syncMessage}</p>}
+          {syncMessage && <p className="vnext-muted text-xs">{syncMessage}</p>}
         </div>
       )}
 
-      {/* Appearance */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">Appearance</h2>
+      <div className="vnext-card p-5">
+        <h2 className="vnext-section-title mb-4">Appearance</h2>
         <div className="flex items-center justify-between py-2">
           <div>
-            <label className="font-medium text-gray-700 dark:text-[#F0EDE4]">Dark Mode</label>
-            <p className="text-xs text-gray-500 dark:text-[#8A9BAA]">Switch to a darker theme</p>
+            <label className="font-medium text-[var(--text-primary)]">Dark Mode</label>
+            <p className="vnext-muted text-xs">Switch to a darker theme</p>
           </div>
           <button
             type="button"
@@ -191,13 +194,12 @@ export function SettingsPage() {
         </div>
       </div>
 
-      {/* App Settings */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">Budget Settings</h2>
+      <div className="vnext-card p-5">
+        <h2 className="vnext-section-title mb-4">Budget Settings</h2>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
               Payday Day of Month
             </label>
             <input
@@ -206,15 +208,15 @@ export function SettingsPage() {
               max="31"
               value={paydayDay}
               onChange={(e) => setPaydayDay(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              className="vnext-input"
             />
-            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
+            <p className="vnext-muted mt-1 text-xs">
               The day you get paid each month (1-31)
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
               Expected Monthly Income (ZAR)
             </label>
             <input
@@ -223,44 +225,41 @@ export function SettingsPage() {
               min="0"
               value={monthlyIncome}
               onChange={(e) => setMonthlyIncome(e.target.value)}
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
+              className="vnext-input"
               placeholder="Optional"
             />
-            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
+            <p className="vnext-muted mt-1 text-xs">
               Used for "Remaining until payday" calculation. Leave empty to use budget total.
             </p>
           </div>
 
           <button
             onClick={saveSettings}
-            className="w-full py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550]"
+            className="vnext-button-primary w-full rounded-2xl py-3 font-semibold"
           >
             Save Settings
           </button>
         </div>
       </div>
 
-      {/* Configurations */}
       <Link
         to="/configurations"
-        className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#2E3A4E] transition-colors"
+        className="vnext-card flex items-center justify-between p-5 transition-colors hover:bg-[var(--surface-secondary)]"
       >
         <div>
-          <div className="font-semibold text-gray-800 dark:text-[#F0EDE4]">Configurations</div>
-          <div className="text-sm text-gray-500 dark:text-[#8A9BAA]">Budget Groups, Categories, Recurring Templates</div>
+          <div className="font-semibold text-[var(--text-primary)]">Configurations</div>
+          <div className="vnext-muted text-sm">Budget Groups, Categories, Recurring Templates</div>
         </div>
         <span className="text-gray-400 dark:text-[#8A9BAA] text-lg">›</span>
       </Link>
 
-      {/* Bank Accounts */}
       <BankAccountsSection />
 
-      {/* AI Check-In */}
-      <div className="bg-white dark:bg-[#252D3D] rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-[#F0EDE4] mb-4">AI Check-In</h2>
+      <div className="vnext-card p-5">
+        <h2 className="vnext-section-title mb-4">AI Check-In</h2>
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">
+            <label className="mb-1 block text-sm font-medium text-[var(--text-primary)]">
               OpenAI API Key
             </label>
             <input
@@ -268,9 +267,9 @@ export function SettingsPage() {
               value={apiKey}
               onChange={(e) => { setApiKey(e.target.value); setApiKeyStatus('none') }}
               placeholder="sk-..."
-              className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060] text-sm"
+              className="vnext-input text-sm"
             />
-            <p className="text-xs text-gray-500 dark:text-[#8A9BAA] mt-1">
+            <p className="vnext-muted mt-1 text-xs">
               Your key stays on this device. Only used for mid-month check-ins.
             </p>
           </div>
@@ -286,7 +285,7 @@ export function SettingsPage() {
                   alert('API key removed.')
                 }
               }}
-              className="px-3 py-2 bg-[#A89060] text-white rounded-lg hover:bg-[#8B7550] text-sm"
+              className="vnext-button-primary rounded-2xl px-4 py-2.5 text-sm font-semibold"
             >
               Save
             </button>
@@ -300,7 +299,7 @@ export function SettingsPage() {
                 setApiKeyStatus(valid ? 'valid' : 'invalid')
                 setApiKeyTesting(false)
               }}
-              className="px-3 py-2 border border-[#A89060] text-[#A89060] rounded-lg text-sm disabled:opacity-50"
+              className="rounded-2xl border border-[#A89060] px-4 py-2.5 text-sm font-semibold text-[#A89060] disabled:opacity-50"
             >
               {apiKeyTesting ? 'Testing...' : 'Test'}
             </button>

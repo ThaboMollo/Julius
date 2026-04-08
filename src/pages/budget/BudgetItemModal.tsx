@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import type {
   BudgetItem,
   BudgetGroup,
@@ -30,8 +30,11 @@ export function BudgetItemModal({
   budgetMonthId,
   defaultGroupId,
 }: Props) {
-  const [groupId, setGroupId] = useState(item?.groupId || defaultGroupId || groups[0]?.id || '')
-  const [categoryId, setCategoryId] = useState(item?.categoryId || '')
+  const initialGroupId = item?.groupId || defaultGroupId || groups[0]?.id || ''
+  const initialCategoryId =
+    item?.categoryId || categories.find((category) => category.groupId === initialGroupId)?.id || ''
+  const [groupId, setGroupId] = useState(initialGroupId)
+  const [categoryId, setCategoryId] = useState(initialCategoryId)
   const [name, setName] = useState(item?.name || '')
   const [plannedAmount, setPlannedAmount] = useState(item?.plannedAmount?.toString() || '')
   const [multiplier, setMultiplier] = useState(item?.multiplier?.toString() || '1')
@@ -43,28 +46,20 @@ export function BudgetItemModal({
     item?.dueDate ? new Date(item.dueDate).getDate().toString() : ''
   )
 
-  useEffect(() => {
-    if (item) {
-      setGroupId(item.groupId)
-      setCategoryId(item.categoryId)
-      setName(item.name)
-      setPlannedAmount(item.plannedAmount.toString())
-      setMultiplier(item.multiplier.toString())
-      setSplitRatioInput(
-        item.splitRatio === 1 ? '1' : item.splitRatio === 0.5 ? '1/2' : item.splitRatio.toString()
-      )
-      setIsBill(item.isBill)
-      setDueDay(item.dueDate ? new Date(item.dueDate).getDate().toString() : '')
-    }
-  }, [item])
+  const filteredCategories = useMemo(
+    () => categories.filter((c) => c.groupId === groupId),
+    [categories, groupId],
+  )
 
-  const filteredCategories = categories.filter((c) => c.groupId === groupId)
-
-  useEffect(() => {
-    if (!item && filteredCategories.length > 0 && !filteredCategories.find((c) => c.id === categoryId)) {
-      setCategoryId(filteredCategories[0].id)
-    }
-  }, [groupId, filteredCategories])
+  function handleGroupChange(nextGroupId: string) {
+    const nextCategories = categories.filter((category) => category.groupId === nextGroupId)
+    setGroupId(nextGroupId)
+    setCategoryId((currentCategoryId) =>
+      nextCategories.some((category) => category.id === currentCategoryId)
+        ? currentCategoryId
+        : (nextCategories[0]?.id ?? ''),
+    )
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -141,7 +136,7 @@ export function BudgetItemModal({
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
             <select
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
+              onChange={(e) => handleGroupChange(e.target.value)}
               className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >

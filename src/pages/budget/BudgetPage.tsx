@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useMonth } from '../../app/MonthContext'
+import { useCallback, useEffect, useState } from 'react'
+import { useMonth } from '../../app/useMonth'
 import {
   budgetMonthRepo,
   budgetItemRepo,
@@ -31,11 +31,7 @@ export function BudgetPage() {
   const [editingItem, setEditingItem] = useState<BudgetItem | null>(null)
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [monthKey])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const year = selectedMonth.getFullYear()
@@ -58,7 +54,11 @@ export function BudgetPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedMonth])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData, monthKey])
 
   async function handleCreateFromTemplates() {
     if (!budgetMonth || templates.length === 0) return

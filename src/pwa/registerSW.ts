@@ -8,9 +8,6 @@ export function registerServiceWorker() {
           updateSW(true)
         }
       },
-      onOfflineReady() {
-        console.log('App ready to work offline')
-      },
     })
   }
 }

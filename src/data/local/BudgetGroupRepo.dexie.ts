@@ -7,6 +7,10 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
+function normalizeName(value: string): string {
+  return value.trim().toLocaleLowerCase()
+}
+
 export const budgetGroupRepo: IBudgetGroupRepo = {
   async getAll(): Promise<BudgetGroup[]> {
     return forActiveUser(await db.budgetGroups.orderBy('sortOrder').toArray())
@@ -23,6 +27,11 @@ export const budgetGroupRepo: IBudgetGroupRepo = {
   },
 
   async create(group: CreateBudgetGroup): Promise<BudgetGroup> {
+    const existing = (await this.getAll()).find((entry) => normalizeName(entry.name) === normalizeName(group.name))
+    if (existing) {
+      throw new Error(`A budget group named "${group.name.trim()}" already exists.`)
+    }
+
     const newGroup: BudgetGroup = {
       ...stampNew(group),
       id: generateId(),
@@ -32,6 +41,14 @@ export const budgetGroupRepo: IBudgetGroupRepo = {
   },
 
   async update(id: string, updates: Partial<BudgetGroup>): Promise<void> {
+    if (updates.name) {
+      const existing = (await this.getAll()).find(
+        (entry) => entry.id !== id && normalizeName(entry.name) === normalizeName(updates.name ?? ''),
+      )
+      if (existing) {
+        throw new Error(`A budget group named "${updates.name.trim()}" already exists.`)
+      }
+    }
     await db.budgetGroups.update(id, stampUpdate(updates))
   },
 

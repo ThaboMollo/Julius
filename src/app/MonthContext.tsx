@@ -1,16 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { format, startOfMonth, addMonths, subMonths } from 'date-fns'
-
-interface MonthContextType {
-  selectedMonth: Date
-  monthKey: string
-  setSelectedMonth: (date: Date) => void
-  goToNextMonth: () => void
-  goToPreviousMonth: () => void
-  goToCurrentMonth: () => void
-}
-
-const MonthContext = createContext<MonthContextType | null>(null)
+import { MonthContext } from './month-context'
 
 const STORAGE_KEY = 'julius_selected_month'
 
@@ -62,12 +52,4 @@ export function MonthProvider({ children }: { children: ReactNode }) {
       {children}
     </MonthContext.Provider>
   )
-}
-
-export function useMonth() {
-  const context = useContext(MonthContext)
-  if (!context) {
-    throw new Error('useMonth must be used within a MonthProvider')
-  }
-  return context
 }

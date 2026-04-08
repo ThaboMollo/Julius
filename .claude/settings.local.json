@@ -29,7 +29,16 @@
       "Bash(git worktree remove:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx tsc:*)",
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(which node:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(git stash:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

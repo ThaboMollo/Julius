@@ -87,8 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (user) {
       // runSync sets activeUserId after migrateLocalRowsToUser completes.
-      void runSync()
-      return
+      const timer = window.setTimeout(() => {
+        void runSync()
+      }, 0)
+      return () => window.clearTimeout(timer)
     }
 
     // user is null (session expired / not logged in). Keep the existing
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // user has ever logged in will this still be __local__.
   }, [offlineMode, runSync, user])
 
-  async function signUp(email: string, password: string) {
+  const signUp = useCallback(async (email: string, password: string) => {
     if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
       throw new Error('Auth is disabled by feature flag.')
     }
@@ -110,9 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     if (error) throw error
-  }
+  }, [])
 
-  async function signIn(email: string, password: string) {
+  const signIn = useCallback(async (email: string, password: string) => {
     if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
       throw new Error('Auth is disabled by feature flag.')
     }
@@ -126,29 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
 
     if (error) throw error
-  }
+  }, [])
 
-  async function signOut() {
-    if (!ENABLE_AUTH || !ENABLE_SUPABASE) return
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      throw error
-    }
-    continueOffline()
-  }
-
-  async function resetPassword(email: string) {
-    if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
-      throw new Error('Auth is disabled by feature flag.')
-    }
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login`,
-    })
-    if (error) throw error
-  }
-
-  function continueOffline() {
+  const continueOffline = useCallback(() => {
     localStorage.setItem(OFFLINE_MODE_KEY, 'true')
     setOfflineMode(true)
     setSession(null)
@@ -158,14 +140,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Resetting to __local__ here would make all migrated data invisible offline.
     setSyncStatus('offline')
     setLastSyncAt(null)
-  }
+  }, [])
 
-  function resumeOnline() {
+  const signOut = useCallback(async () => {
+    if (!ENABLE_AUTH || !ENABLE_SUPABASE) return
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      throw error
+    }
+    continueOffline()
+  }, [continueOffline])
+
+  const resetPassword = useCallback(async (email: string) => {
+    if (!ENABLE_AUTH || !ENABLE_SUPABASE) {
+      throw new Error('Auth is disabled by feature flag.')
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login`,
+    })
+    if (error) throw error
+  }, [])
+
+  const resumeOnline = useCallback(() => {
     localStorage.removeItem(OFFLINE_MODE_KEY)
     setOfflineMode(false)
     setAuthLoading(true)
     setSyncStatus('idle')
-  }
+  }, [])
 
   const loading = ENABLE_AUTH && ENABLE_SUPABASE && !offlineMode ? authLoading : false
 

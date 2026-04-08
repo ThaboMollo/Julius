@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { budgetGroupRepo, categoryRepo, templateRepo } from '../../data/local'
+import { budgetGroupRepo, categoryRepo, db, templateRepo } from '../../data/local'
 import type {
   BudgetGroup,
   Category,
@@ -11,6 +11,21 @@ import type {
   RecurringTemplateTargetKind,
 } from '../../domain/models'
 import { formatCurrency } from '../../domain/constants'
+import { activeUserId, stampUpdate } from '../../data/local/scoped'
+
+function normalizeName(value: string): string {
+  return value.trim().toLocaleLowerCase()
+}
+
+function pickPreferredRecord<T extends { isDefault?: boolean; isActive?: boolean; createdAt: string }>(items: T[]): T {
+  return [...items].sort((a, b) => {
+    const defaultDelta = Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault))
+    if (defaultDelta !== 0) return defaultDelta
+    const activeDelta = Number(Boolean(b.isActive)) - Number(Boolean(a.isActive))
+    if (activeDelta !== 0) return activeDelta
+    return a.createdAt.localeCompare(b.createdAt)
+  })[0]
+}
 
 export function ConfigurationsPage() {
   const [loading, setLoading] = useState(true)
@@ -25,13 +40,10 @@ export function ConfigurationsPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [editingTemplate, setEditingTemplate] = useState<RecurringTemplate | null>(null)
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
+      await dedupeConfigurations()
       const [grps, cats, tmpls] = await Promise.all([
         budgetGroupRepo.getAll(),
         categoryRepo.getAll(),
@@ -42,6 +54,98 @@ export function ConfigurationsPage() {
       setTemplates(tmpls)
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadData()
+  }, [loadData])
+
+  async function dedupeConfigurations() {
+    const userId = activeUserId()
+
+    const groups = await budgetGroupRepo.getAll()
+    const duplicateGroups = new Map<string, BudgetGroup[]>()
+    for (const group of groups) {
+      const key = normalizeName(group.name)
+      duplicateGroups.set(key, [...(duplicateGroups.get(key) ?? []), group])
+    }
+
+    for (const entries of duplicateGroups.values()) {
+      if (entries.length < 2) continue
+      const keeper = pickPreferredRecord(entries)
+      const duplicates = entries.filter((entry) => entry.id !== keeper.id)
+
+      await db.budgetGroups.update(
+        keeper.id,
+        stampUpdate({
+          isDefault: keeper.isDefault || duplicates.some((entry) => entry.isDefault),
+          isActive: keeper.isActive || duplicates.some((entry) => entry.isActive),
+          sortOrder: Math.min(keeper.sortOrder, ...duplicates.map((entry) => entry.sortOrder)),
+        }),
+      )
+
+      for (const duplicate of duplicates) {
+        await db.categories
+          .where('[userId+groupId]')
+          .equals([userId, duplicate.id])
+          .modify(stampUpdate({ groupId: keeper.id }))
+        await db.budgetItems
+          .where('groupId')
+          .equals(duplicate.id)
+          .filter((item) => item.userId === userId && item.deletedAt === null)
+          .modify(stampUpdate({ groupId: keeper.id }))
+        await db.recurringTemplates
+          .where('[userId+groupId]')
+          .equals([userId, duplicate.id])
+          .modify(stampUpdate({ groupId: keeper.id }))
+        await budgetGroupRepo.delete(duplicate.id)
+      }
+    }
+
+    const categories = await categoryRepo.getAll()
+    const duplicateCategories = new Map<string, Category[]>()
+    for (const category of categories) {
+      const key = `${category.groupId}:${normalizeName(category.name)}`
+      duplicateCategories.set(key, [...(duplicateCategories.get(key) ?? []), category])
+    }
+
+    for (const entries of duplicateCategories.values()) {
+      if (entries.length < 2) continue
+      const keeper = pickPreferredRecord(entries)
+      const duplicates = entries.filter((entry) => entry.id !== keeper.id)
+
+      await db.categories.update(
+        keeper.id,
+        stampUpdate({
+          isDefault: keeper.isDefault || duplicates.some((entry) => entry.isDefault),
+          isActive: keeper.isActive || duplicates.some((entry) => entry.isActive),
+        }),
+      )
+
+      for (const duplicate of duplicates) {
+        await db.budgetItems
+          .where('categoryId')
+          .equals(duplicate.id)
+          .filter((item) => item.userId === userId && item.deletedAt === null)
+          .modify(stampUpdate({ categoryId: keeper.id }))
+        await db.transactions
+          .where('categoryId')
+          .equals(duplicate.id)
+          .filter((tx) => tx.userId === userId && tx.deletedAt === null)
+          .modify(stampUpdate({ categoryId: keeper.id }))
+        await db.recurringTemplates
+          .where('categoryId')
+          .equals(duplicate.id)
+          .filter((template) => template.userId === userId && template.deletedAt === null)
+          .modify(stampUpdate({ categoryId: keeper.id }))
+        await db.commitments
+          .where('categoryId')
+          .equals(duplicate.id)
+          .filter((commitment) => commitment.userId === userId && commitment.deletedAt === null)
+          .modify(stampUpdate({ categoryId: keeper.id }))
+        await categoryRepo.delete(duplicate.id)
+      }
     }
   }
 
@@ -321,13 +425,17 @@ export function ConfigurationsPage() {
           onClose={() => setShowGroupModal(false)}
           group={editingGroup}
           onSave={async (data) => {
-            if (editingGroup) {
-              await budgetGroupRepo.update(editingGroup.id, data)
-            } else {
-              await budgetGroupRepo.create(data)
+            try {
+              if (editingGroup) {
+                await budgetGroupRepo.update(editingGroup.id, data)
+              } else {
+                await budgetGroupRepo.create(data)
+              }
+              setShowGroupModal(false)
+              await loadData()
+            } catch (error) {
+              alert(error instanceof Error ? error.message : 'Failed to save group.')
             }
-            setShowGroupModal(false)
-            await loadData()
           }}
           existingGroups={groups}
         />
@@ -340,13 +448,17 @@ export function ConfigurationsPage() {
           category={editingCategory}
           groups={groups.filter((g) => g.isActive)}
           onSave={async (data) => {
-            if (editingCategory) {
-              await categoryRepo.update(editingCategory.id, data)
-            } else {
-              await categoryRepo.create(data)
+            try {
+              if (editingCategory) {
+                await categoryRepo.update(editingCategory.id, data)
+              } else {
+                await categoryRepo.create(data)
+              }
+              setShowCategoryModal(false)
+              await loadData()
+            } catch (error) {
+              alert(error instanceof Error ? error.message : 'Failed to save category.')
             }
-            setShowCategoryModal(false)
-            await loadData()
           }}
         />
       )}
@@ -359,13 +471,17 @@ export function ConfigurationsPage() {
           groups={groups.filter((g) => g.isActive)}
           categories={categories.filter((c) => c.isActive)}
           onSave={async (data) => {
-            if (editingTemplate) {
-              await templateRepo.update(editingTemplate.id, data)
-            } else {
-              await templateRepo.create(data)
+            try {
+              if (editingTemplate) {
+                await templateRepo.update(editingTemplate.id, data)
+              } else {
+                await templateRepo.create(data)
+              }
+              setShowTemplateModal(false)
+              await loadData()
+            } catch (error) {
+              alert(error instanceof Error ? error.message : 'Failed to save template.')
             }
-            setShowTemplateModal(false)
-            await loadData()
           }}
         />
       )}
@@ -532,8 +648,11 @@ function TemplateModal({
   categories: Category[]
   onSave: (data: CreateRecurringTemplate) => void
 }) {
-  const [groupId, setGroupId] = useState(template?.groupId || groups[0]?.id || '')
-  const [categoryId, setCategoryId] = useState(template?.categoryId || '')
+  const initialGroupId = template?.groupId || groups[0]?.id || ''
+  const initialCategoryId =
+    template?.categoryId || categories.find((category) => category.groupId === initialGroupId)?.id || ''
+  const [groupId, setGroupId] = useState(initialGroupId)
+  const [categoryId, setCategoryId] = useState(initialCategoryId)
   const [name, setName] = useState(template?.name || '')
   const [plannedAmount, setPlannedAmount] = useState(template?.plannedAmount?.toString() || '')
   const [multiplier, setMultiplier] = useState(template?.multiplier?.toString() || '1')
@@ -546,11 +665,15 @@ function TemplateModal({
 
   const filteredCategories = categories.filter((c) => c.groupId === groupId)
 
-  useEffect(() => {
-    if (filteredCategories.length > 0 && !filteredCategories.find((c) => c.id === categoryId)) {
-      setCategoryId(filteredCategories[0].id)
-    }
-  }, [groupId, filteredCategories])
+  function handleGroupChange(nextGroupId: string) {
+    const nextCategories = categories.filter((category) => category.groupId === nextGroupId)
+    setGroupId(nextGroupId)
+    setCategoryId((currentCategoryId) =>
+      nextCategories.some((category) => category.id === currentCategoryId)
+        ? currentCategoryId
+        : (nextCategories[0]?.id ?? ''),
+    )
+  }
 
   if (!isOpen) return null
 
@@ -604,7 +727,7 @@ function TemplateModal({
             <label className="block text-sm font-medium text-gray-700 dark:text-[#F0EDE4] mb-1">Group</label>
             <select
               value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
+              onChange={(e) => handleGroupChange(e.target.value)}
               className="w-full px-3 py-2 border dark:border-[#2E3A4E] rounded-lg bg-white dark:bg-[#1E2330] text-gray-800 dark:text-[#F0EDE4] focus:ring-2 focus:ring-[#A89060]"
               required
             >

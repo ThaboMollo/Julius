@@ -1,16 +1,7 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { ThemeContext } from './theme-context'
 
-interface ThemeContextValue {
-  isDark: boolean
-  toggleTheme: () => void
-}
-
-const ThemeContext = createContext<ThemeContextValue>({
-  isDark: false,
-  toggleTheme: () => {},
-})
-
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [isDark, setIsDark] = useState(() => {
     try {
       return localStorage.getItem('julius-theme') === 'dark'
@@ -38,8 +29,4 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       {children}
     </ThemeContext.Provider>
   )
-}
-
-export function useTheme() {
-  return useContext(ThemeContext)
 }
