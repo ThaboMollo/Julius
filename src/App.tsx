@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
+import { Analytics } from '@vercel/analytics/react'
 import { Layout } from './app/Layout'
 import { DashboardPage } from './pages/dashboard/DashboardPage'
 import { BudgetPage } from './pages/budget/BudgetPage'
@@ -54,6 +55,7 @@ function App() {
 
   return (
     <MonthProvider>
+      <Analytics />
       {globalError && (
         <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#fee', padding: '12px', fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto', borderTop: '2px solid red' }}>
           <strong>Error:</strong> {globalError}
