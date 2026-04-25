@@ -160,8 +160,11 @@ export class JuliusDB extends Dexie {
         })
 
         await tx.table('recurringTemplates').toCollection().modify((record: Record<string, unknown>) => {
+          // Default rule: a template flagged as a bill generates a commitment
+          // (so it shows up in the unified bills/debts/subscriptions list).
+          // Non-bill templates generate a planning-line BudgetItem.
           if (!record.targetKind) {
-            record.targetKind = record.isBill ? 'budget_item' : 'budget_item'
+            record.targetKind = record.isBill ? 'commitment' : 'budget_item'
           }
           record.updatedAt = now
         })

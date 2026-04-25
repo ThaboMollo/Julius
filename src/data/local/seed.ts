@@ -29,6 +29,21 @@ function generationJournalId(
   return `${templateId}:${monthKey}:${outputKind}`
 }
 
+/**
+ * Resolve which kind of record a recurring template should generate for a
+ * given month.
+ *
+ * Stable contract:
+ * - If `targetKind` is set on the template, use it verbatim. New templates
+ *   created via `templateRepo.create()` always set this explicitly.
+ * - If `targetKind` is unset (legacy data only), fall back to: bill → commitment,
+ *   non-bill → budget_item. This matches the v6 migration's default and the
+ *   intent of the `isBill` flag.
+ *
+ * Do not change this fallback without a Dexie migration: existing journal
+ * entries are keyed on `(templateId, monthKey, outputKind)` and a different
+ * outputKind would generate a duplicate row alongside the existing one.
+ */
 function inferTemplateTargetKind(template: RecurringTemplate): RecurringTemplateTargetKind {
   return template.targetKind ?? (template.isBill ? 'commitment' : 'budget_item')
 }
