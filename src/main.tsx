@@ -5,15 +5,21 @@ import './index.css'
 import App from './App.tsx'
 import { ThemeProvider } from './app/ThemeContext'
 import { AuthProvider } from './auth/AuthProvider'
+import { ErrorBoundary } from './app/ErrorBoundary'
+import { ToasterProvider } from './app/Toaster'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <ThemeProvider>
-        <AuthProvider>
-          <App />
-        </AuthProvider>
-      </ThemeProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <ToasterProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ToasterProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { onSupabaseAuthStateChange, supabase } from '../cloud/supabaseClient'
 import { ENABLE_AUTH, ENABLE_SUPABASE } from '../config/flags'
 import { AuthContext } from './context'
 import { LOCAL_USER_ID, setActiveUserId } from './userScope'
 import { SyncOrchestrator, getSyncStateForUser, type SyncStatus } from '../sync/SyncOrchestrator'
+import { emit } from '../services/observability'
+import { useToast } from '../app/Toaster'
 
 const OFFLINE_MODE_KEY = 'julius-offline-mode'
 const orchestrator = new SyncOrchestrator()
@@ -22,6 +24,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null)
   const [dataVersion, setDataVersion] = useState(0)
 
+  const toast = useToast()
+  const toastRef = useRef(toast)
+  useEffect(() => {
+    toastRef.current = toast
+  }, [toast])
+
   const runSync = useCallback(async () => {
     if (!user || offlineMode) return
     try {
@@ -37,7 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       // Even if cloud sync fails, local rows were re-scoped in pass 1 of
       // migrateLocalRowsToUser, so set active user so the UI can see them.
-      console.error('[Julius] Sync failed:', err)
+      const message = err instanceof Error ? err.message : String(err)
+      emit({ type: 'sync.failure', userId: user.id, stage: 'unknown', message })
+      toastRef.current.error("Sync failed — your data is safe locally. We'll retry on the next sync.")
       setActiveUserId(user.id)
       setDataVersion((v) => v + 1)
       setSyncStatus('error')
@@ -96,6 +106,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // user is null (session expired / not logged in). Keep the existing
     // activeUserId so migrated data remains accessible. Only if no real
     // user has ever logged in will this still be __local__.
+  }, [offlineMode, runSync, user])
+
+  // Auto-recover from a failed sync when the window regains focus or the
+  // browser reports we're back online. The orchestrator's inFlightByUser
+  // map dedupes against the on-login sync, so we cannot double-fire.
+  const syncStatusRef = useRef(syncStatus)
+  useEffect(() => {
+    syncStatusRef.current = syncStatus
+  }, [syncStatus])
+
+  useEffect(() => {
+    if (offlineMode || !user) return
+
+    const tryRetry = () => {
+      if (syncStatusRef.current === 'error' || syncStatusRef.current === 'idle') {
+        void runSync().catch(() => {
+          // already surfaced via toast + observability; swallow here.
+        })
+      }
+    }
+    window.addEventListener('focus', tryRetry)
+    window.addEventListener('online', tryRetry)
+    return () => {
+      window.removeEventListener('focus', tryRetry)
+      window.removeEventListener('online', tryRetry)
+    }
   }, [offlineMode, runSync, user])
 
   const signUp = useCallback(async (email: string, password: string) => {

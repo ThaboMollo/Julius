@@ -19,19 +19,23 @@ import { MonthProvider } from './app/MonthContext'
 import { SplashScreen } from './app/SplashScreen'
 import { seedDefaults } from './data/local/seed'
 import { initializeLocalData } from './data/local/migrations'
+import { useToast } from './app/Toaster'
+import { emit } from './services/observability'
 
 function App() {
   const [dbReady, setDbReady] = useState(false)
   const [splashDone, setSplashDone] = useState(false)
-  const [globalError, setGlobalError] = useState('')
+  const toast = useToast()
 
   useEffect(() => {
     const handler = (e: ErrorEvent) => {
-      setGlobalError(`${e.message}\n${e.filename}:${e.lineno}:${e.colno}`)
+      emit({ type: 'render.error', componentStack: '', message: `${e.message} @ ${e.filename}:${e.lineno}:${e.colno}` })
+      toast.error('Something went wrong. Try reloading if it keeps happening.')
     }
     const rejectionHandler = (e: PromiseRejectionEvent) => {
-      const msg = e.reason instanceof Error ? `${e.reason.message}\n${e.reason.stack?.split('\n').slice(0, 3).join('\n')}` : String(e.reason)
-      setGlobalError(msg)
+      const msg = e.reason instanceof Error ? e.reason.message : String(e.reason)
+      emit({ type: 'render.error', componentStack: '', message: msg })
+      toast.error('Something went wrong. Check Settings → Diagnostics for details.')
     }
     window.addEventListener('error', handler)
     window.addEventListener('unhandledrejection', rejectionHandler)
@@ -39,7 +43,7 @@ function App() {
       window.removeEventListener('error', handler)
       window.removeEventListener('unhandledrejection', rejectionHandler)
     }
-  }, [])
+  }, [toast])
 
   useEffect(() => {
     seedDefaults()
@@ -56,12 +60,6 @@ function App() {
   return (
     <MonthProvider>
       <Analytics />
-      {globalError && (
-        <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999, background: '#fee', padding: '12px', fontSize: '11px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', maxHeight: '40vh', overflow: 'auto', borderTop: '2px solid red' }}>
-          <strong>Error:</strong> {globalError}
-          <button onClick={() => setGlobalError('')} style={{ float: 'right', padding: '4px 8px' }}>Dismiss</button>
-        </div>
-      )}
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

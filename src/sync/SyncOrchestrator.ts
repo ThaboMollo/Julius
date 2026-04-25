@@ -17,6 +17,21 @@ import type {
   Transaction,
 } from '../domain/models'
 import { nowIso } from '../auth/userScope'
+import { emit } from '../services/observability'
+
+type SyncStage = 'pull' | 'push' | 'migrate' | 'dedup' | 'unknown'
+
+async function safeToArray<T>(label: string, run: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await run()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.toLowerCase().includes('quota')) {
+      emit({ type: 'storage.quota', operation: label, message })
+    }
+    throw err
+  }
+}
 
 const DEVICE_ID_KEY = 'julius-device-id'
 
@@ -58,20 +73,37 @@ export class SyncOrchestrator {
   }
 
   private async runInternal(userId: string): Promise<void> {
+    const startedAt = Date.now()
+    emit({ type: 'sync.start', userId })
+
     const syncState = await ensureSyncState(userId)
 
-    await migrateLocalRowsToUser(userId)
-    await deduplicateLocalData(userId)
+    await runStage('migrate', userId, () => migrateLocalRowsToUser(userId))
+    await runStage('dedup', userId, () => deduplicateLocalData(userId))
 
-    const pullAt = nowIso()
+    // Pull and track the maximum cloud `updated_at` we observed so the next
+    // pull resumes at exactly that watermark. Using `nowIso()` taken before
+    // the pull would create a race: a row written server-side during the
+    // pull would be missed on the next sync.
+    let maxPulledUpdatedAt: string | null = null
     for (const table of TABLE_ORDER) {
-      await pullTable(table.local, table.cloud, userId, syncState.lastPullAt)
+      const watermark = await runStage('pull', userId, () =>
+        pullTable(table.local, table.cloud, userId, syncState.lastPullAt),
+      )
+      if (watermark && (maxPulledUpdatedAt === null || watermark > maxPulledUpdatedAt)) {
+        maxPulledUpdatedAt = watermark
+      }
     }
-    await db.syncStateLocal.update(userId, { lastPullAt: pullAt })
+
+    if (maxPulledUpdatedAt) {
+      await db.syncStateLocal.update(userId, { lastPullAt: maxPulledUpdatedAt })
+    }
 
     const pushAt = nowIso()
     for (const table of TABLE_ORDER) {
-      await pushTable(table.local, table.cloud, userId, syncState.lastPushAt)
+      await runStage('push', userId, () =>
+        pushTable(table.local, table.cloud, userId, syncState.lastPushAt),
+      )
     }
     await db.syncStateLocal.update(userId, {
       lastPushAt: pushAt,
@@ -79,6 +111,18 @@ export class SyncOrchestrator {
       lastSyncAt: nowIso(),
       deviceId: getDeviceId(),
     })
+
+    emit({ type: 'sync.success', userId, durationMs: Date.now() - startedAt })
+  }
+}
+
+async function runStage<T>(stage: SyncStage, userId: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    emit({ type: 'sync.failure', userId, stage, message })
+    throw err
   }
 }
 
@@ -127,7 +171,7 @@ async function migrateLocalRowsToUser(userId: string): Promise<void> {
 
   for (const table of TABLE_ORDER) {
     const localTable = db.table(table.local)
-    const localRows = (await localTable.toArray()).filter(
+    const localRows = (await safeToArray(`migrate.${table.local}`, () => localTable.toArray())).filter(
       (row) => row.userId === '__local__' && row.deletedAt === null,
     )
     if (localRows.length === 0) continue
@@ -305,7 +349,7 @@ async function pullTable(
   cloudTableName: (typeof TABLE_ORDER)[number]['cloud'],
   userId: string,
   lastPullAt: string | null,
-): Promise<void> {
+): Promise<string | null> {
   let query = supabase.from(cloudTableName).select('*').eq('user_id', userId)
   if (lastPullAt) {
     query = query.gt('updated_at', lastPullAt)
@@ -317,7 +361,14 @@ async function pullTable(
   }
 
   const localTable = db.table(localTableName)
+  let maxUpdatedAt: string | null = null
+
   for (const cloudRow of data ?? []) {
+    const cloudUpdated = String(cloudRow.updated_at ?? '')
+    if (cloudUpdated && (maxUpdatedAt === null || cloudUpdated > maxUpdatedAt)) {
+      maxUpdatedAt = cloudUpdated
+    }
+
     const local = await localTable.get(cloudRow.id)
     if (!local) {
       await localTable.put(fromCloudRecord(localTableName, cloudRow, userId))
@@ -325,12 +376,13 @@ async function pullTable(
     }
 
     const localUpdated = String(local.updatedAt ?? '')
-    const cloudUpdated = String(cloudRow.updated_at ?? '')
 
     if (cloudUpdated >= localUpdated) {
       await localTable.put(fromCloudRecord(localTableName, cloudRow, userId))
     }
   }
+
+  return maxUpdatedAt
 }
 
 async function pushTable(
@@ -340,7 +392,9 @@ async function pushTable(
   lastPushAt: string | null,
 ): Promise<void> {
   const localTable = db.table(localTableName)
-  let rows = (await localTable.toArray()).filter((row) => row.userId === userId)
+  let rows = (await safeToArray(`push.${localTableName}`, () => localTable.toArray())).filter(
+    (row) => row.userId === userId,
+  )
 
   if (lastPushAt) {
     rows = rows.filter((row) => String(row.updatedAt ?? '') > lastPushAt)
