@@ -38,7 +38,9 @@
       "Bash(find:*)",
       "Bash(grep:*)",
       "Bash(git stash:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(xargs -I {} bash -c 'echo \"=== {} ===\" && grep -E \"^export \\(default|const|function|interface|type|class|async\\)\" {} | head -5')",
+      "Bash(npm test *)"
     ]
   }
 }
